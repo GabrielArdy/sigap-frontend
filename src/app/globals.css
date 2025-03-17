@@ -3,6 +3,32 @@
 @theme {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-midnight-blue-50: #eff7ff;
+  --color-midnight-blue-100: #dfeeff;
+  --color-midnight-blue-200: #b7dfff;
+  --color-midnight-blue-300: #78c5ff;
+  --color-midnight-blue-400: #30a8ff;
+  --color-midnight-blue-500: #058cf2;
+  --color-midnight-blue-600: #006fcf;
+  --color-midnight-blue-700: #0058a7;
+  --color-midnight-blue-800: #024b8a;
+  --color-midnight-blue-900: #073764;
+  --color-midnight-blue-950: #05284c;
+
+  --color-cerulean-blue-50: #f1f5fd;
+  --color-cerulean-blue-100: #e0e8f9;
+  --color-cerulean-blue-200: #c8d7f5;
+  --color-cerulean-blue-300: #a3bfed;
+  --color-cerulean-blue-400: #779ce3;
+  --color-cerulean-blue-500: #567cdb;
+  --color-cerulean-blue-600: #4260ce;
+  --color-cerulean-blue-700: #3549b1;
+  --color-cerulean-blue-800: #33419a;
+  --color-cerulean-blue-900: #2e3a7a;
+  --color-cerulean-blue-950: #20264b;
+
+
 }
 
 :root {
