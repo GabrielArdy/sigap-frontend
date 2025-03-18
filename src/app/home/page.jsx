@@ -1,5 +1,6 @@
 'use client'
 import Image from 'next/image';
+import { Router } from 'next/router';
 import React, { useState } from 'react';
 import { FaUserCircle, FaBell, FaSignOutAlt, FaSignInAlt, FaDoorOpen, FaClipboardList, FaHistory } from 'react-icons/fa';
 
@@ -26,6 +27,7 @@ export default function HomePage() {
     setTimeout(() => setCheckInActive(false), 300);
     console.log("Check in at:", new Date());
     // Add your check-in logic here
+    Router.push('/check-in');
   };
 
   // Handle check out function
@@ -34,6 +36,7 @@ export default function HomePage() {
     setTimeout(() => setCheckOutActive(false), 300);
     console.log("Check out at:", new Date());
     // Add your check-out logic here
+    Router.push('/check-out');
   };
 
   return (
