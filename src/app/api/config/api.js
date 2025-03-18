@@ -4,7 +4,7 @@ import axios from 'axios';
 dotenv.config();
 
 const api = axios.create({
-    baseURL: process.env.API_URL,
+    baseURL: 'https://sigap-backend-968z.vercel.app/api',
     headers: {
         'Content-Type': 'application/json',
     },
