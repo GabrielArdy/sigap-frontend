@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner } from 'react-icons/fa';
+import Swal from 'sweetalert2';
 
 export default function ScanPage() {
   const videoRef = useRef(null);
@@ -34,8 +35,30 @@ export default function ScanPage() {
             terminal: "Terminal-AB12",
             timestamp: new Date().toISOString()
           };
-          setScanResult(mockResult);
+          
+          // Stop camera first
           stopCamera();
+          
+          // Show success message with SweetAlert
+          Swal.fire({
+            icon: 'success',
+            title: 'Absensi Berhasil',
+            html: `
+              <div class="text-left">
+                <p><strong>Lokasi:</strong> ${mockResult.location}</p>
+                <p><strong>Terminal:</strong> ${mockResult.terminal}</p>
+                <p><strong>Waktu:</strong> ${new Date(mockResult.timestamp).toLocaleTimeString('id-ID')}</p>
+              </div>
+            `,
+            confirmButtonText: 'Kembali ke Beranda',
+            confirmButtonColor: '#3549b1',
+          }).then((result) => {
+            if (result.isConfirmed) {
+              window.location.href = '/home';
+            }
+          });
+          
+          setScanResult(mockResult);
         }, 5000);
       }
     } catch (err) {
@@ -43,6 +66,14 @@ export default function ScanPage() {
       setHasPermission(false);
       setScanMessage('Tidak dapat mengakses kamera. Berikan izin kamera untuk melanjutkan.');
       setIsScanning(false);
+      
+      // Show error message with SweetAlert
+      Swal.fire({
+        icon: 'error',
+        title: 'Akses Kamera Gagal',
+        text: 'Tidak dapat mengakses kamera. Pastikan Anda memberikan izin kamera untuk aplikasi ini.',
+        confirmButtonColor: '#3549b1',
+      });
     }
   };
   
@@ -62,6 +93,22 @@ export default function ScanPage() {
       stopCamera();
     };
   }, []);
+
+  // Handle scan failure
+  const handleScanFailed = (message) => {
+    stopCamera();
+    Swal.fire({
+      icon: 'error',
+      title: 'Scan Gagal',
+      text: message || 'QR Code tidak valid atau terjadi kesalahan saat memproses.',
+      confirmButtonColor: '#3549b1',
+      confirmButtonText: 'Coba Lagi',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        startCamera();
+      }
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -138,39 +185,6 @@ export default function ScanPage() {
                 </div>
               </div>
             </>
-          )}
-          
-          {scanResult && (
-            <div className="p-6 text-center">
-              <div className="w-20 h-20 rounded-full bg-green-100 mx-auto flex items-center justify-center mb-4">
-                <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Absensi Berhasil</h2>
-              <p className="text-gray-300 mb-6">QR Code berhasil dipindai</p>
-              <div className="bg-white bg-opacity-10 rounded-lg p-4 mb-6">
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-300">Lokasi:</span>
-                  <span className="text-white font-medium">{scanResult.location}</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-300">Terminal:</span>
-                  <span className="text-white font-medium">{scanResult.terminal}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-300">Waktu:</span>
-                  <span className="text-white font-medium">
-                    {new Date(scanResult.timestamp).toLocaleTimeString('id-ID')}
-                  </span>
-                </div>
-              </div>
-              <Link href="/home">
-                <button className="w-full py-3 bg-[#3549b1] text-white rounded-lg font-medium">
-                  Kembali ke Beranda
-                </button>
-              </Link>
-            </div>
           )}
         </div>
         

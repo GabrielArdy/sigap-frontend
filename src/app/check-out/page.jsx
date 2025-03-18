@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner, FaDoorOpen } from 'react-icons/fa';
+import Swal from 'sweetalert2';
 
 export default function CheckoutPage() {
   const videoRef = useRef(null);
@@ -9,6 +10,28 @@ export default function CheckoutPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [scanMessage, setScanMessage] = useState('Posisikan QR Code dalam bingkai');
+  
+  // Show success alert
+  const showSuccessAlert = (result) => {
+    Swal.fire({
+      title: 'Absen Pulang Berhasil!',
+      text: `Terima kasih atas kerja keras Anda hari ini. Durasi kerja: ${result.duration}`,
+      icon: 'success',
+      confirmButtonColor: '#3549b1',
+      confirmButtonText: 'OK'
+    });
+  };
+  
+  // Show error alert
+  const showErrorAlert = (message) => {
+    Swal.fire({
+      title: 'Gagal Absen Pulang',
+      text: message || 'Terjadi kesalahan saat memproses absensi pulang Anda.',
+      icon: 'error',
+      confirmButtonColor: '#3549b1',
+      confirmButtonText: 'Coba Lagi'
+    });
+  };
   
   // Start camera when component mounts
   const startCamera = async () => {
@@ -35,8 +58,12 @@ export default function CheckoutPage() {
             timestamp: new Date().toISOString(),
             duration: "08h 30m" // Duration of work day
           };
+          
           setScanResult(mockResult);
           stopCamera();
+          
+          // Show success alert
+          showSuccessAlert(mockResult);
         }, 5000);
       }
     } catch (err) {
@@ -44,6 +71,9 @@ export default function CheckoutPage() {
       setHasPermission(false);
       setScanMessage('Tidak dapat mengakses kamera. Berikan izin kamera untuk melanjutkan.');
       setIsScanning(false);
+      
+      // Show error alert
+      showErrorAlert('Tidak dapat mengakses kamera. Pastikan Anda memberikan izin kamera.');
     }
   };
   
@@ -180,7 +210,10 @@ export default function CheckoutPage() {
         {/* Cancel button - only show when scanning */}
         {isScanning && (
           <button 
-            onClick={stopCamera} 
+            onClick={() => {
+              stopCamera();
+              showErrorAlert('Proses scan dibatalkan');
+            }} 
             className="mt-6 py-4 px-6 bg-white border border-gray-300 text-gray-700 rounded-full font-medium shadow-md flex items-center justify-center mx-auto hover:bg-gray-100 transition-colors"
           >
             Batal
