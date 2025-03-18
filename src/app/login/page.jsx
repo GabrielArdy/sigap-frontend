@@ -23,8 +23,8 @@ export default function Login() {
       
       if (response.success) {
         // Store user data or token in localStorage/sessionStorage
-        localStorage.setItem('token', response.token);
-        localStorage.setItem('user', JSON.stringify(response.user));
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
         
         // Redirect to dashboard or home page
         router.push('/home');
