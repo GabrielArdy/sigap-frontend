@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import AuthService from '../api/auth/auth_service';
 
 export default function Login() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ export default function Login() {
     setError('');
     
     try {
-      const response = await AuthService.login({ username, password });
+      const response = await AuthService.login({ email, password });
       
       if (response.success) {
         // Store user data or token in localStorage/sessionStorage
@@ -27,7 +27,7 @@ export default function Login() {
         localStorage.setItem('user', JSON.stringify(response.user));
         
         // Redirect to dashboard or home page
-        router.push('/dashboard');
+        router.push('/home');
       } else {
         setError(response.message || 'Login failed. Please check your credentials.');
       }
@@ -77,18 +77,18 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="flex-grow flex flex-col md:block">
             <div className="space-y-6 md:space-y-5 flex-grow flex flex-col">
               <div className="rounded-lg md:p-0">
-                <label htmlFor="username" className="block text-sm font-medium text-[#2e3a7a] mb-2 md:mb-1">
-                  Username
+                <label htmlFor="email" className="block text-sm font-medium text-[#2e3a7a] mb-2 md:mb-1">
+                  email
                 </label>
                 <input
-                  id="username"
-                  name="username"
+                  id="email"
+                  name="email"
                   type="text"
                   required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-[#c8d7f5] bg-white text-[#333] focus:ring-2 focus:ring-[#3549b1] focus:border-transparent transition duration-200"
-                  placeholder="Masukkan username"
+                  placeholder="Masukkan Email"
                   disabled={loading}
                 />
               </div>
