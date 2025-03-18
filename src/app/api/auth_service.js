@@ -1,4 +1,4 @@
-import api from "../config/api";
+import api from "./config/api";
 /**
    * Login user with email and password
    * @param {object} data - User data for login

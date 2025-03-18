@@ -1,26 +1,60 @@
 'use client'
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaUserCircle, FaBell, FaSignOutAlt, FaSignInAlt, FaDoorOpen, FaClipboardList, FaHistory, FaClock, FaCalendarAlt, FaIdCard, FaCheckCircle } from 'react-icons/fa';
+import AttendanceService from '../api/attendance_service';
 
 export default function HomePage() {
-  // Mock data - replace with actual user data and attendance logic
-  const userData = {
-    name: "John Doe",
-    employeeId: "NIP123456",
-    avatarUrl: null, // Replace with actual image URL
-    todayAttendance: {
-      date: new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
-      checkIn: "08:05",
-      checkOut: "17:30"
-    }
-  };
+  // State for user data, loading, and error handling
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Animation states
   const [checkInActive, setCheckInActive] = useState(false);
   const [checkOutActive, setCheckOutActive] = useState(false);
   const router = useRouter();
+
+  // Fetch user data on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Get user from localStorage and parse the JSON string
+        const userString = localStorage.getItem('user');
+        if (!userString) {
+          setError('User not found in localStorage');
+          setLoading(false);
+          return;
+        }
+        
+        const user = JSON.parse(userString);
+        const userId = user.userId;
+        
+        const response = await AttendanceService.getUserDashboard(userId);
+        
+        if (response.success) {
+          setUserData(response.data);
+        } else {
+          setError('Failed to load data');
+        }
+      } catch (err) {
+        setError('Error fetching data: ' + (err.message || 'Unknown error'));
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Format time from ISO string to HH:MM format
+  const formatTime = (isoString) => {
+    if (!isoString) return "-";
+    const date = new Date(isoString);
+    return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  };
 
   // Handle check in function
   const handleCheckIn = () => {
@@ -38,6 +72,27 @@ export default function HomePage() {
     console.log("Check out at:", new Date());
     // Add your check-out logic here
     router.push('/check-out');
+  };
+
+  // Prepare display data based on API response
+  const displayData = userData ? {
+    name: `${userData.user.firstName} ${userData.user.lastName}`,
+    employeeId: userData.user.nip,
+    avatarUrl: null, // API doesn't provide avatar URL
+    todayAttendance: {
+      date: new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+      checkIn: formatTime(userData.attendanceData?.checkIn),
+      checkOut: formatTime(userData.attendanceData?.checkOut)
+    }
+  } : {
+    name: "Loading...",
+    employeeId: "Loading...",
+    avatarUrl: null,
+    todayAttendance: {
+      date: new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+      checkIn: "-",
+      checkOut: "-"
+    }
   };
 
   return (
@@ -59,72 +114,85 @@ export default function HomePage() {
       </header>
 
       <main className="container mx-auto px-4 py-5 flex flex-col gap-5 max-w-md">
-        {/* Greeting Card with user info */}
-        <div className="bg-white rounded-2xl p-5 shadow-md hover:shadow-lg transition-shadow duration-200 border border-gray-100">
-          <div className="flex items-center space-x-4">
-            {userData.avatarUrl ? (
-              <Image 
-                src={userData.avatarUrl} 
-                alt="User avatar" 
-                className="w-16 h-16 rounded-full border-2 border-[#3549b1]" 
-              />
-            ) : (
-              <div className="bg-[#e0e8f9] p-3 rounded-full">
-                <FaUserCircle className="w-12 h-12 text-[#3549b1]" />
-              </div>
-            )}
-            <div className="flex-1">
-              <h2 className="text-xl font-bold">{userData.name}</h2>
-              <div className="flex items-center text-sm text-gray-600 mt-1">
-                <FaIdCard className="mr-1 text-[#3549b1]" />
-                <p>NIP: {userData.employeeId}</p>
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#3549b1]"></div>
+            <p className="mt-2">Loading...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 text-red-600 p-4 rounded-xl text-center">
+            {error}
+          </div>
+        ) : (
+          <>
+            {/* Greeting Card with user info */}
+            <div className="bg-white rounded-2xl p-5 shadow-md hover:shadow-lg transition-shadow duration-200 border border-gray-100">
+              <div className="flex items-center space-x-4">
+                {displayData.avatarUrl ? (
+                  <Image 
+                    src={displayData.avatarUrl} 
+                    alt="User avatar" 
+                    className="w-16 h-16 rounded-full border-2 border-[#3549b1]" 
+                  />
+                ) : (
+                  <div className="bg-[#e0e8f9] p-3 rounded-full">
+                    <FaUserCircle className="w-12 h-12 text-[#3549b1]" />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold">{displayData.name}</h2>
+                  <div className="flex items-center text-sm text-gray-600 mt-1">
+                    <FaIdCard className="mr-1 text-[#3549b1]" />
+                    <p>NIP: {displayData.employeeId}</p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Today's Attendance Card - Redesigned with repositioned date */}
-        <div className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200 border border-gray-100">
-          <div className="bg-gradient-to-r from-[#e0e8f9] to-[#f0f4fd] p-4">
-            <div className="flex items-center">
-              <FaHistory className="text-[#3549b1] mr-2 text-lg" />
-              <h3 className="text-lg font-bold text-[#20264b]">Kehadiran Hari Ini</h3>
-            </div>
-          </div>
-          
-          <div className="px-5 pt-3 pb-2 border-b border-gray-100">
-            <div className="flex items-center text-sm text-gray-600">
-              <FaCalendarAlt className="text-[#3549b1] mr-2" />
-              <span>{userData.todayAttendance.date}</span>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4 p-5">
-            <div className="bg-[#f8fafc] p-4 rounded-xl border border-gray-100 relative overflow-hidden group hover:shadow-md transition-all">
-              <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
-              <div className="flex justify-between items-start mb-2">
-                <div className="rounded-full bg-green-100 p-2">
-                  <FaSignInAlt className="text-green-600" />
+            {/* Today's Attendance Card - Redesigned with repositioned date */}
+            <div className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200 border border-gray-100">
+              <div className="bg-gradient-to-r from-[#e0e8f9] to-[#f0f4fd] p-4">
+                <div className="flex items-center">
+                  <FaHistory className="text-[#3549b1] mr-2 text-lg" />
+                  <h3 className="text-lg font-bold text-[#20264b]">Kehadiran Hari Ini</h3>
                 </div>
-                <FaClock className="text-gray-400 group-hover:text-[#3549b1] transition-colors" />
               </div>
-              <p className="text-xs text-gray-500 mb-1">Jam Masuk</p>
-              <p className="text-xl font-semibold text-[#3549b1]">{userData.todayAttendance.checkIn || "-"}</p>
-            </div>
-            
-            <div className="bg-[#f8fafc] p-4 rounded-xl border border-gray-100 relative overflow-hidden group hover:shadow-md transition-all">
-              <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-              <div className="flex justify-between items-start mb-2">
-                <div className="rounded-full bg-blue-100 p-2">
-                  <FaDoorOpen className="text-blue-600" />
+              
+              <div className="px-5 pt-3 pb-2 border-b border-gray-100">
+                <div className="flex items-center text-sm text-gray-600">
+                  <FaCalendarAlt className="text-[#3549b1] mr-2" />
+                  <span>{displayData.todayAttendance.date}</span>
                 </div>
-                <FaClock className="text-gray-400 group-hover:text-[#3549b1] transition-colors" />
               </div>
-              <p className="text-xs text-gray-500 mb-1">Jam Keluar</p>
-              <p className="text-xl font-semibold text-[#3549b1]">{userData.todayAttendance.checkOut || "-"}</p>
+              
+              <div className="grid grid-cols-2 gap-4 p-5">
+                <div className="bg-[#f8fafc] p-4 rounded-xl border border-gray-100 relative overflow-hidden group hover:shadow-md transition-all">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="rounded-full bg-green-100 p-2">
+                      <FaSignInAlt className="text-green-600" />
+                    </div>
+                    <FaClock className="text-gray-400 group-hover:text-[#3549b1] transition-colors" />
+                  </div>
+                  <p className="text-xs text-gray-500 mb-1">Jam Masuk</p>
+                  <p className="text-xl font-semibold text-[#3549b1]">{displayData.todayAttendance.checkIn}</p>
+                </div>
+                
+                <div className="bg-[#f8fafc] p-4 rounded-xl border border-gray-100 relative overflow-hidden group hover:shadow-md transition-all">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="rounded-full bg-blue-100 p-2">
+                      <FaDoorOpen className="text-blue-600" />
+                    </div>
+                    <FaClock className="text-gray-400 group-hover:text-[#3549b1] transition-colors" />
+                  </div>
+                  <p className="text-xs text-gray-500 mb-1">Jam Keluar</p>
+                  <p className="text-xl font-semibold text-[#3549b1]">{displayData.todayAttendance.checkOut}</p>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
 
         {/* Attendance Actions */}
         <div className="grid grid-cols-2 gap-4">

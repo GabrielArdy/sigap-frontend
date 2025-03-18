@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { useState } from 'react';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
-import AuthService from '../api/auth/auth_service';
+import AuthService from '../api/auth_service';
 
 export default function Login() {
   const [email, setEmail] = useState('');
