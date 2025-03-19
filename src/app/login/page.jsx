@@ -50,17 +50,25 @@ export default function Login() {
       
       {/* Mobile header - only visible on small screens */}
       <div className="fixed top-0 left-0 right-0 bg-[#3549b1] py-6 flex justify-center md:hidden z-10">
-        <div className="w-20 h-20 rounded-full bg-[#a3bfed] flex items-center justify-center shadow-lg">
-          <span className="text-white text-xl font-bold">LOGO</span>
-        </div>
+        <Image 
+          src="/app-icon.png" 
+          alt="App Logo" 
+          width={80} 
+          height={80}
+          className="object-contain"
+        />
       </div>
       
       <div className="w-full h-full md:h-auto md:max-w-md bg-white md:rounded-xl md:shadow-xl overflow-hidden flex flex-col">
         {/* Desktop header - hidden on mobile */}
         <div className="hidden md:flex bg-[#3549b1] py-6 px-4 justify-center">
-          <div className="w-24 h-24 rounded-full bg-[#a3bfed] flex items-center justify-center shadow-lg">
-            <span className="text-white text-2xl font-bold">LOGO</span>
-          </div>
+          <Image 
+            src="/app-icon.png" 
+            alt="App Logo" 
+            width={100} 
+            height={100}
+            className="object-contain"
+          />
         </div>
         
         <div className="pt-28 pb-16 px-6 sm:px-10 md:pt-8 md:pb-10 flex-grow flex flex-col justify-center">
