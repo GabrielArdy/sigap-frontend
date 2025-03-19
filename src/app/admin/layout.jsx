@@ -92,19 +92,19 @@ export default function DashboardLayout({ children }) {
       children: [
         {
           name: 'Laporan Kehadiran',
-          path: '/dashboard/pengaturan/laporan',
+          path: '/admin/settings/report-template',
         },
         {
           name: 'Periode',
-          path: '/dashboard/pengaturan/laporan',
+          path: '/admin/settings/period',
         },
         {
           name: 'Anjungan',
-          path: '/dashboard/pengaturan/anjungan',
+          path: '/admin/settings/station',
         },
         {
           name: 'Akses Admin',
-          path: '/dashboard/pengaturan/admin',
+          path: '/admin/settings/access',
         },
       ],
     },

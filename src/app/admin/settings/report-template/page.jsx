@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { FiUpload, FiFile, FiUser, FiFileText, FiX, FiCheck } from 'react-icons/fi';
 import Swal from 'sweetalert2';
+// Fix the import path - use relative path instead of alias
+import DragDropFilePicker from '../../../../components/DragDropFilePicker';
 
 export default function TemplateUploadPage() {
   // Form state
@@ -182,56 +184,17 @@ export default function TemplateUploadPage() {
               File Template Excel <span className="text-red-500">*</span>
             </label>
             
-            {!excelPreview ? (
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                <div className="space-y-1 text-center">
-                  <FiFile className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600">
-                    <label htmlFor="excelTemplate" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
-                      <span>Upload template</span>
-                      <input 
-                        id="excelTemplate" 
-                        name="excelTemplate" 
-                        type="file" 
-                        accept=".xlsx" 
-                        className="sr-only"
-                        onChange={handleExcelChange}
-                      />
-                    </label>
-                    <p className="pl-1">atau drag and drop</p>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    Hanya file XLSX yang diperbolehkan
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-1 flex items-center p-4 border border-gray-300 rounded-md bg-gray-50">
-                <FiFileText className="h-8 w-8 text-blue-500 mr-3" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {excelPreview}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Excel Template
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={removeExcelFile}
-                  className="ml-4 flex-shrink-0 p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:bg-gray-100"
-                >
-                  <span className="sr-only">Remove file</span>
-                  <FiX className="h-5 w-5" />
-                </button>
-              </div>
-            )}
-            
-            {errors.excelFile && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.excelFile}
-              </p>
-            )}
+            <DragDropFilePicker
+              id="excelTemplate"
+              accept=".xlsx"
+              icon={FiFile}
+              label="template"
+              description="Hanya file XLSX yang diperbolehkan"
+              filePreview={excelPreview}
+              onChange={handleExcelChange}
+              onRemove={removeExcelFile}
+              error={errors.excelFile}
+            />
           </div>
           
           {/* Principal name */}
@@ -249,7 +212,7 @@ export default function TemplateUploadPage() {
                 name="principalName"
                 value={principalName}
                 onChange={handlePrincipalNameChange}
-                className="block w-full pl-10 pr-12 sm:text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 placeholder="Masukkan nama lengkap kepala sekolah"
               />
             </div>
@@ -266,62 +229,44 @@ export default function TemplateUploadPage() {
               File Tanda Tangan <span className="text-red-500">*</span>
             </label>
             
-            {!signaturePreview ? (
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                <div className="space-y-1 text-center">
-                  <FiUpload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600">
-                    <label htmlFor="signatureFile" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
-                      <span>Upload tanda tangan</span>
-                      <input 
-                        id="signatureFile" 
-                        name="signatureFile" 
-                        type="file" 
-                        accept="image/jpeg,image/png" 
-                        className="sr-only"
-                        onChange={handleSignatureChange}
-                      />
-                    </label>
-                    <p className="pl-1">atau drag and drop</p>
+            <DragDropFilePicker
+              id="signatureFile"
+              accept="image/jpeg,image/png"
+              icon={FiUpload}
+              label="tanda tangan"
+              description="File JPG atau PNG, maks 2MB"
+              filePreview={signaturePreview ? true : ""}
+              onChange={handleSignatureChange}
+              onRemove={removeSignatureFile}
+              error={errors.signatureFile}
+              previewComponent={signaturePreview && (
+                <div className="mt-1 flex flex-col sm:flex-row sm:items-center p-4 border border-gray-300 rounded-md bg-gray-50">
+                  <div className="w-40 h-20 bg-white border rounded-md overflow-hidden mb-3 sm:mb-0 sm:mr-4">
+                    <img 
+                      src={signaturePreview} 
+                      alt="Preview tanda tangan"
+                      className="w-full h-full object-contain" 
+                    />
                   </div>
-                  <p className="text-xs text-gray-500">
-                    File JPG atau PNG, maks 2MB
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">
+                      Tanda Tangan Kepala Sekolah
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Tanda tangan akan digunakan pada laporan
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeSignatureFile}
+                    className="mt-2 sm:mt-0 sm:ml-4 flex-shrink-0 p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:bg-gray-100"
+                  >
+                    <span className="sr-only">Remove file</span>
+                    <FiX className="h-5 w-5" />
+                  </button>
                 </div>
-              </div>
-            ) : (
-              <div className="mt-1 flex flex-col sm:flex-row sm:items-center p-4 border border-gray-300 rounded-md bg-gray-50">
-                <div className="w-40 h-20 bg-white border rounded-md overflow-hidden mb-3 sm:mb-0 sm:mr-4">
-                  <img 
-                    src={signaturePreview} 
-                    alt="Preview tanda tangan"
-                    className="w-full h-full object-contain" 
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">
-                    Tanda Tangan Kepala Sekolah
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Tanda tangan akan digunakan pada laporan
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={removeSignatureFile}
-                  className="mt-2 sm:mt-0 sm:ml-4 flex-shrink-0 p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:bg-gray-100"
-                >
-                  <span className="sr-only">Remove file</span>
-                  <FiX className="h-5 w-5" />
-                </button>
-              </div>
-            )}
-            
-            {errors.signatureFile && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.signatureFile}
-              </p>
-            )}
+              )}
+            />
           </div>
           
           {/* Instructions panel */}
