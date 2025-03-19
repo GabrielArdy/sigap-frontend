@@ -71,7 +71,7 @@ export default function DashboardLayout({ children }) {
     {
       name: 'Dashboard',
       icon: <FiHome className="w-5 h-5" />,
-      path: '/dashboard',
+      path: '/admin/dashboard',
     },
     {
       name: 'Data Guru',
@@ -81,7 +81,7 @@ export default function DashboardLayout({ children }) {
     {
       name: 'Data Kehadiran',
       icon: <FiCalendar className="w-5 h-5" />,
-      path: '/dashboard/kehadiran',
+      path: '/admin/attendance',
     },
     {
       name: 'Pengaturan',
@@ -92,6 +92,10 @@ export default function DashboardLayout({ children }) {
       children: [
         {
           name: 'Laporan Kehadiran',
+          path: '/dashboard/pengaturan/laporan',
+        },
+        {
+          name: 'Periode',
           path: '/dashboard/pengaturan/laporan',
         },
         {
