@@ -106,7 +106,7 @@ export default function DashboardLayout({ children }) {
     },
   ];
 
-  // Profile actions
+  // Profile action
   const profileActions = [
     {
       name: 'Profile',
