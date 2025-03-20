@@ -17,6 +17,12 @@ export default function AddAnjunganPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const searchTimeoutRef = useRef(null);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchInputRef = useRef(null);
+  const searchResultsRef = useRef(null);
+  const [geocoderError, setGeocoderError] = useState(null);
   
   const router = useRouter();
   const mapRef = useRef(null);
@@ -24,6 +30,7 @@ export default function AddAnjunganPage() {
   const markerRef = useRef(null);
   const circleRef = useRef(null);
   const [mapStylesLoaded, setMapStylesLoaded] = useState(false);
+  const geocoderRef = useRef(null);
   
   // Initial map center (Indonesia)
   const center = {
@@ -72,13 +79,25 @@ export default function AddAnjunganPage() {
         // Store map instance in ref
         mapInstanceRef.current = map;
 
-        // Store the geocoder for external use
-        window.geocoder = L.Control.Geocoder.nominatim({
-          geocodingQueryParams: { 
-            countrycodes: 'id', // Prioritize Indonesia
-            limit: 5
-          }
-        });
+        // Store the Leaflet instance globally for access in event handlers
+        window.L = L;
+        
+        // Create and store geocoder for external use
+        try {
+          // Fix: Use L.Control.Geocoder.nominatim() instead of trying to use it as a constructor
+          geocoderRef.current = L.Control.Geocoder.nominatim({
+            geocodingQueryParams: { 
+              countrycodes: 'id', // Prioritize Indonesia
+              limit: 10,
+              format: 'json',
+              addressdetails: 1
+            }
+          });
+          console.log("Geocoder initialized:", geocoderRef.current);
+        } catch (error) {
+          console.error("Failed to initialize geocoder:", error);
+          setGeocoderError("Gagal mengaktifkan pencarian lokasi");
+        }
 
         // Enable free drag and zoom
         map.scrollWheelZoom.enable();
@@ -91,6 +110,7 @@ export default function AddAnjunganPage() {
       }
     }).catch(error => {
       console.error("Error loading map libraries:", error);
+      setGeocoderError("Gagal memuat pustaka peta");
     });
     
     // Cleanup function
@@ -204,36 +224,147 @@ export default function AddAnjunganPage() {
     }, 800);
   };
 
-  // Handle search box input change
+  // Handle search box input change with debounce
   const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
-  };
-
-  // Handle search form submission
-  const handleSearch = async (e) => {
-    e.preventDefault();
+    const value = e.target.value;
+    setSearchQuery(value);
     
-    if (!searchQuery.trim() || !window.geocoder) return;
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Set new timeout for debounce
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedQuery(value);
+      if (value.trim().length >= 3) {
+        performSearch(value);
+      } else {
+        setSearchResults([]);
+      }
+    }, 300); // 300ms debounce delay - more responsive like Google Maps
+  };
+  
+  // Perform the search - modify to default to direct API call which is more reliable
+  const performSearch = (query) => {
+    if (!query.trim()) return;
     
     setIsSearching(true);
-    setSearchResults([]);
+    setGeocoderError(null);
     
+    // Use direct API call which is more reliable
+    fetchNominatimResults(query);
+  };
+  
+  // Fetch results directly from Nominatim API
+  const fetchNominatimResults = async (query) => {
     try {
-      window.geocoder.geocode(searchQuery, (results) => {
-        setIsSearching(false);
-        setSearchResults(results);
-      });
+      setIsSearching(true);
+      
+      // Use fetch to get data directly from Nominatim API
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&countrycodes=id&limit=10`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'SIGAP Attendance System (https://example.com)'  // Add a proper User-Agent to avoid request rejection
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Direct API results:", data);
+      
+      // Convert Nominatim API results to the format expected by our component
+      const results = data.map(item => ({
+        name: item.display_name.split(',')[0],
+        html: item.display_name,
+        center: {
+          lat: parseFloat(item.lat),
+          lng: parseFloat(item.lon)
+        },
+        properties: {
+          address: item.address
+        }
+      }));
+      
+      processSearchResults(results);
     } catch (error) {
-      console.error("Search error:", error);
+      console.error("Nominatim API error:", error);
       setIsSearching(false);
+      setGeocoderError("Gagal melakukan pencarian. Silakan coba lagi.");
+      setSearchResults([]);
     }
+  };
+  
+  // Process search results
+  const processSearchResults = (results) => {
+    setIsSearching(false);
+    
+    if (results && results.length > 0) {
+      console.log("Search results:", results);
+      // Format and process results for better display
+      const processedResults = results.map(result => {
+        // Extract city, region, country from the result if possible
+        let details = {
+          name: result.name || '',
+          address: '',
+          city: '',
+          region: '',
+          country: '',
+          lat: result.center.lat,
+          lng: result.center.lng
+        };
+        
+        // Try to extract structured address info if available
+        if (result.properties && result.properties.address) {
+          const addr = result.properties.address;
+          details.city = addr.city || addr.town || addr.village || '';
+          details.region = addr.state || addr.county || '';
+          details.country = addr.country || '';
+          
+          // Build formatted address
+          let addressParts = [];
+          if (addr.road) addressParts.push(addr.road);
+          if (addr.suburb) addressParts.push(addr.suburb);
+          if (details.city) addressParts.push(details.city);
+          if (details.region) addressParts.push(details.region);
+          if (details.country) addressParts.push(details.country);
+          
+          details.address = addressParts.join(', ');
+        } else if (result.html) {
+          // Extract from HTML if structured data not available
+          details.address = result.html.replace(/<[^>]*>/g, ', ')
+            .replace(/^[,\s]+|[,\s]+$/g, '')
+            .replace(/,\s*,/g, ',');
+        }
+        
+        return {
+          ...result,
+          details
+        };
+      });
+      
+      setSearchResults(processedResults);
+    } else {
+      setSearchResults([]);
+    }
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
   };
 
   // Handle search result selection
   const handleSelectLocation = (result) => {
     if (!mapInstanceRef.current) return;
     
-    const L = window.L; // Access Leaflet from the window object
     const center = result.center;
     
     setFormData({
@@ -245,14 +376,14 @@ export default function AddAnjunganPage() {
     // Update marker and circle
     if (markerRef.current) {
       markerRef.current.setLatLng(center);
-    } else if (L) {
-      markerRef.current = L.marker(center).addTo(mapInstanceRef.current);
+    } else if (window.L) {
+      markerRef.current = window.L.marker(center).addTo(mapInstanceRef.current);
     }
 
     if (circleRef.current) {
       circleRef.current.setLatLng(center);
-    } else if (L) {
-      circleRef.current = L.circle(center, {
+    } else if (window.L) {
+      circleRef.current = window.L.circle(center, {
         radius: formData.radius,
         color: '#3B82F6',
         fillColor: '#3B82F6',
@@ -267,6 +398,23 @@ export default function AddAnjunganPage() {
     setSearchResults([]);
     setSearchQuery('');
   };
+
+  // Handle click outside search results to close dropdown
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (searchResultsRef.current && 
+          !searchResultsRef.current.contains(event.target) &&
+          searchInputRef.current && 
+          !searchInputRef.current.contains(event.target)) {
+        setSearchResults([]);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -425,61 +573,108 @@ export default function AddAnjunganPage() {
         
         {/* Map */}
         <div className="lg:col-span-3">
-          {/* Search box above map */}
-          <div className="bg-white shadow-md rounded-lg p-4 mb-4">
-            <form onSubmit={handleSearch} className="flex items-center space-x-2">
-              <div className="relative flex-grow">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FiMapPin className="h-5 w-5 text-gray-400" />
+          {/* Google Maps style search box */}
+          <div className="relative z-10 w-full mb-4">
+            <div className={`bg-white rounded-lg shadow-lg transition-all duration-200 text-gray-700 ${searchFocused || searchResults.length > 0 ? 'shadow-xl' : ''}`}>
+              {/* Search input with icon */}
+              <div className="flex items-center p-3">
+                <div className="flex-none mx-2">
+                  <svg className="w-5 h-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={searchQuery}
                   onChange={handleSearchChange}
-                  placeholder="Cari lokasi atau alamat..."
-                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 pr-3 py-3 text-gray-700 text-base border border-gray-300 rounded-md shadow"
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  placeholder="Cari lokasi di peta..."
+                  className="flex-grow text-base border-none outline-none focus:ring-0 py-2 px-1"
                 />
-                {isSearching && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <svg className="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                {isSearching ? (
+                  <div className="flex-none mx-2">
+                    <svg className="animate-spin w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                   </div>
-                )}
+                ) : searchQuery ? (
+                  <button 
+                    onClick={clearSearch}
+                    className="flex-none mx-2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                    type="button"
+                  >
+                    <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                ) : null}
               </div>
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-md text-base font-medium shadow-sm transition duration-150 ease-in-out"
-              >
-                Cari
-              </button>
-            </form>
-
-            {/* Search results */}
-            {searchResults.length > 0 && (
-              <div className="mt-2 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                <ul className="divide-y divide-gray-200">
-                  {searchResults.map((result, index) => (
-                    <li key={index} className="cursor-pointer hover:bg-gray-50">
-                      <button
+              
+              {/* Search results */}
+              {searchResults.length > 0 && (
+                <div ref={searchResultsRef} className="border-t border-gray-100">
+                  <div className="py-1 max-h-80 overflow-y-auto">
+                    {searchResults.map((result, index) => (
+                      <div 
+                        key={index} 
+                        className="cursor-pointer hover:bg-gray-50 transition-colors"
                         onClick={() => handleSelectLocation(result)}
-                        className="w-full text-left px-4 py-3"
                       >
-                        <div className="font-medium text-gray-800">{result.name}</div>
-                        {result.html && (
-                          <div 
-                            className="text-sm text-gray-600 mt-1"
-                            dangerouslySetInnerHTML={{ __html: result.html }}
-                          />
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+                        <div className="px-4 py-3 flex">
+                          <div className="flex-none mr-3 pt-1">
+                            <FiMapPin className="h-5 w-5 text-gray-400" />
+                          </div>
+                          <div className="flex-grow">
+                            <div className="font-medium text-gray-900 line-clamp-1">
+                              {result.details?.name || result.name || 'Lokasi yang ditemukan'}
+                            </div>
+                            <div className="text-sm text-gray-500 line-clamp-2">
+                              {result.details?.address || 
+                               (result.html ? result.html.replace(/<[^>]*>/g, '') : 
+                               `${result.center.lat.toFixed(6)}, ${result.center.lng.toFixed(6)}`)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Error message */}
+              {geocoderError && (
+                <div className="border-t border-gray-100 py-3 px-4 text-center text-red-500">
+                  {geocoderError}
+                </div>
+              )}
+              
+              {/* Empty state message */}
+              {searchQuery && !isSearching && !geocoderError && searchResults.length === 0 && debouncedQuery.length >= 3 && (
+                <div className="border-t border-gray-100 py-3 px-4 text-center text-gray-500">
+                  Tidak ada lokasi ditemukan untuk "{searchQuery}"
+                </div>
+              )}
+              
+              {/* Minimum characters hint */}
+              {debouncedQuery && debouncedQuery.length < 3 && !geocoderError && (
+                <div className="border-t border-gray-100 py-3 px-4 text-center text-gray-500">
+                  Masukkan minimal 3 karakter untuk mencari
+                </div>
+              )}
+            </div>
           </div>
+          
+          {/* Debug info */}
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="mb-2 text-xs bg-white p-2 rounded shadow-sm text-gray-700">
+              <div>Results count: {searchResults.length}</div>
+              <div>Geocoder initialized: {geocoderRef.current ? 'Yes' : 'No'}</div>
+              <div>Search status: {isSearching ? 'Searching...' : 'Idle'}</div>
+            </div>
+          )}
           
           {/* Map container */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -504,7 +699,7 @@ export default function AddAnjunganPage() {
               </div>
               <div className="ml-3">
                 <p className="text-sm text-blue-700">
-                  Gunakan kotak pencarian di atas peta untuk mencari alamat atau lokasi. Klik pada hasil pencarian untuk menetapkan lokasi anjungan.
+                  Gunakan kolom pencarian untuk menemukan lokasi atau klik langsung pada peta untuk menentukan lokasi anjungan.
                 </p>
               </div>
             </div>

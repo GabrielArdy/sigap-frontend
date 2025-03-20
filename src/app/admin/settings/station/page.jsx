@@ -341,17 +341,6 @@ export default function AnjunganPage() {
             <FiExternalLink className="mr-2" />
             Tambah di Halaman Baru
           </Link>
-          <button
-            onClick={toggleNewAnjunganMode}
-            className={`inline-flex items-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none transition ease-in-out duration-150 ${
-              newAnjunganMode 
-                ? 'bg-red-100 border-red-200 text-red-700 hover:bg-red-200'
-                : 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700'
-            }`}
-          >
-            <FiPlusCircle className="mr-2" />
-            {newAnjunganMode ? 'Batal' : 'Tambah Langsung'}
-          </button>
         </div>
       </div>
 
