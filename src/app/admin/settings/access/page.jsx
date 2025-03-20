@@ -242,16 +242,6 @@ export default function AdminAccessPage() {
             Kelola pengguna yang memiliki akses admin
           </p>
         </div>
-        
-        <div className="mt-4 md:mt-0">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:border-blue-800 focus:ring ring-blue-300 transition ease-in-out duration-150"
-          >
-            <FiPlus className="mr-2" />
-            Tambah User
-          </button>
-        </div>
       </div>
 
       {/* Search bar */}
