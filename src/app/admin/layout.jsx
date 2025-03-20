@@ -91,20 +91,16 @@ export default function DashboardLayout({ children }) {
       toggle: () => setSettingsOpen(!isSettingsOpen),
       children: [
         {
-          name: 'Laporan Kehadiran',
-          path: '/admin/settings/report-template',
-        },
-        {
-          name: 'Periode',
-          path: '/admin/settings/period',
+          name: 'Akses Admin',
+          path: '/admin/settings/access',
         },
         {
           name: 'Anjungan',
           path: '/admin/settings/station',
         },
         {
-          name: 'Akses Admin',
-          path: '/admin/settings/access',
+          name: 'Laporan Kehadiran',
+          path: '/admin/settings/report-template',
         },
       ],
     },
