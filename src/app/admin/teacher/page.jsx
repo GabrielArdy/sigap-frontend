@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react';
-import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiFilter, FiRefreshCw } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiFilter, FiRefreshCw, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import Swal from 'sweetalert2';
 import { useRouter } from 'next/navigation';
+import { getUsers, deleteUser } from '../../api/user_service';
 
 export default function DataGuruPage() {
   const router = useRouter();
@@ -14,75 +15,95 @@ export default function DataGuruPage() {
   const [search, setSearch] = useState('');
   const [jabatanFilter, setJabatanFilter] = useState('semua');
   const [loading, setLoading] = useState(true);
+  
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 10,
+    pages: 1
+  });
 
-  // Fetch data on component mount
+  // Fetch data when pagination page changes or filters change
   useEffect(() => {
     fetchTeachers();
-  }, []);
+  }, [pagination.page, jabatanFilter]);
   
-  // Example function to fetch teachers - replace with actual API call
+  // Function to fetch teachers using the API with pagination and filters
   const fetchTeachers = async () => {
     setLoading(true);
     try {
-      // In a real app, replace this with API call
-      // const response = await fetch('/api/guru');
-      // const data = await response.json();
+      // Build filter object for backend
+      const filter = {};
       
-      // Mock data for demonstration
-      const mockData = [
-        { id: 1, nip: '197501152005011002', nama: 'Budi Santoso', jabatan: 'Guru' },
-        { id: 2, nip: '198603222010012005', nama: 'Siti Rahayu', jabatan: 'Guru' },
-        { id: 3, nip: null, nama: 'Ahmad Fauzi', jabatan: 'Guru' },
-        { id: 4, nip: '196712102002122001', nama: 'Dewi Kartika', jabatan: 'TU' },
-        { id: 5, nip: '198107282008011003', nama: 'Rina Wijaya', jabatan: 'Guru' },
-        { id: 6, nip: null, nama: 'Denny Nugraha', jabatan: 'TU' },
-        { id: 7, nip: '199205172015031001', nama: 'Putri Handayani', jabatan: 'Guru' },
-        { id: 8, nip: null, nama: 'Irwan Setiawan', jabatan: 'Guru' },
-      ];
+      if (jabatanFilter !== 'semua') {
+        filter.position = jabatanFilter;
+      }
       
-      // Simulate API delay
-      setTimeout(() => {
-        setTeachers(mockData);
-        setFilteredTeachers(mockData);
-        setLoading(false);
-      }, 500);
+      if (search.trim()) {
+        // For search, we'll send it as a special filter property
+        // Backend will implement logic to search in firstName, lastName or ID
+        filter.search = search.trim();
+      }
       
+      // Pass pagination parameters and filters to the API call
+      const response = await getUsers(pagination.page, pagination.limit, filter);
+      
+      if (response && response.success) {
+        const teachersData = response.data.map(user => ({
+          id: user.userId,  // Keep userId as internal ID
+          nip: user.nip || null,  // Use NIP if available, otherwise null (will be displayed as '-')
+          nama: `${user.firstName} ${user.lastName}`,
+          jabatan: user.position
+        }));
+        
+        setTeachers(teachersData);
+        setFilteredTeachers(teachersData);
+        
+        // Set pagination info from API response
+        if (response.pagination) {
+          setPagination(response.pagination);
+        }
+      } else {
+        console.error('Failed to fetch teachers data');
+        Swal.fire({
+          title: 'Error',
+          text: 'Gagal memuat data guru',
+          icon: 'error',
+        });
+      }
+      
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching data:', error);
       setLoading(false);
+      Swal.fire({
+        title: 'Error',
+        text: 'Terjadi kesalahan saat memuat data',
+        icon: 'error',
+      });
     }
   };
 
-  // Apply filters whenever search or jabatan filter changes
+  // Handle search with debounce
   useEffect(() => {
-    filterTeachers();
-  }, [search, jabatanFilter, teachers]);
+    const handler = setTimeout(() => {
+      // When search changes, reset to page 1 and fetch with new search term
+      setPagination(prev => ({...prev, page: 1}));
+      fetchTeachers();
+    }, 500); // 500ms debounce
 
-  // Filter function
-  const filterTeachers = () => {
-    let results = [...teachers];
-    
-    // Apply search filter
-    if (search.trim()) {
-      const searchLower = search.toLowerCase();
-      results = results.filter(teacher => 
-        teacher.nama.toLowerCase().includes(searchLower) || 
-        (teacher.nip && teacher.nip.includes(searchLower))
-      );
-    }
-    
-    // Apply jabatan filter
-    if (jabatanFilter !== 'semua') {
-      results = results.filter(teacher => teacher.jabatan === jabatanFilter);
-    }
-    
-    setFilteredTeachers(results);
-  };
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [search]);
 
   // Reset filters
   const resetFilters = () => {
     setSearch('');
     setJabatanFilter('semua');
+    setPagination(prev => ({...prev, page: 1}));
+    // fetchTeachers will be called by the useEffect that watches filter changes
   };
 
   // Handle add teacher
@@ -92,15 +113,10 @@ export default function DataGuruPage() {
 
   // Handle edit teacher
   const handleEditTeacher = (id) => {
-    // In a real app, navigate to edit form or show modal with id
-    Swal.fire({
-      title: 'Edit Guru',
-      text: `Edit guru dengan ID: ${id}`,
-      icon: 'info',
-    });
+    router.push(`/admin/teacher/edit/${id}`);
   };
 
-  // Handle delete teacher
+  // Handle delete teacher with API call
   const handleDeleteTeacher = (id) => {
     Swal.fire({
       title: 'Hapus Data',
@@ -111,25 +127,37 @@ export default function DataGuruPage() {
       cancelButtonColor: '#3085d6',
       confirmButtonText: 'Ya, hapus!',
       cancelButtonText: 'Batal'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        // In a real app, make API call to delete
-        // const deleteTeacher = async () => {
-        //   await fetch(`/api/guru/${id}`, { method: 'DELETE' });
-        //   fetchTeachers(); // Refresh data
-        // };
-        // deleteTeacher();
-        
-        // Mock deletion
-        setTeachers(teachers.filter(teacher => teacher.id !== id));
-        
-        Swal.fire(
-          'Terhapus!',
-          'Data guru telah dihapus.',
-          'success'
-        );
+        try {
+          await deleteUser(id);
+          fetchTeachers(); // Refresh data after deletion
+          
+          Swal.fire(
+            'Terhapus!',
+            'Data guru telah dihapus.',
+            'success'
+          );
+        } catch (error) {
+          console.error('Error deleting teacher:', error);
+          Swal.fire(
+            'Error',
+            'Gagal menghapus data guru.',
+            'error'
+          );
+        }
       }
     });
+  };
+
+  // Handle page change for pagination
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.pages) {
+      setPagination(prevPagination => ({
+        ...prevPagination,
+        page: newPage
+      }));
+    }
   };
 
   return (
@@ -243,10 +271,10 @@ export default function DataGuruPage() {
                 filteredTeachers.map((teacher, index) => (
                   <tr key={teacher.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {index + 1}
+                      {((pagination.page - 1) * pagination.limit) + index + 1}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {teacher.nip || '-'}
+                      {teacher.nip || "-"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {teacher.nama}
@@ -285,24 +313,88 @@ export default function DataGuruPage() {
           </table>
         </div>
 
-        {/* Pagination - can be implemented for large datasets */}
+        {/* Pagination */}
         {!loading && filteredTeachers.length > 0 && (
           <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
             <div className="flex-1 flex justify-between sm:hidden">
-              <button className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+              <button 
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page === 1}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+              >
                 Previous
               </button>
-              <button className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+              <button 
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page === pagination.pages}
+                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+              >
                 Next
               </button>
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700">
-                  Menampilkan <span className="font-medium">1</span> sampai <span className="font-medium">{filteredTeachers.length}</span> dari <span className="font-medium">{filteredTeachers.length}</span> data
+                  Menampilkan <span className="font-medium">{((pagination.page - 1) * pagination.limit) + 1}</span> sampai <span className="font-medium">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> dari <span className="font-medium">{pagination.total}</span> data
                 </p>
               </div>
-              {/* Pagination controls can be added here if needed */}
+              <div>
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                  <button
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={pagination.page === 1}
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <span className="sr-only">Previous</span>
+                    <FiChevronLeft className="h-5 w-5" />
+                  </button>
+                  
+                  {/* Limited page numbers display with ellipsis */}
+                  {Array.from({ length: pagination.pages }).map((_, i) => {
+                    // Always show first page, last page, current page, and pages around current
+                    const pageNumber = i + 1;
+                    const showPageNumber = pageNumber === 1 || 
+                                         pageNumber === pagination.pages || 
+                                         Math.abs(pageNumber - pagination.page) <= 1;
+                    
+                    // Show ellipsis for gaps
+                    if (!showPageNumber) {
+                      // Show ellipsis before and after the current page range
+                      if (pageNumber === 2 || pageNumber === pagination.pages - 1) {
+                        return (
+                          <span key={pageNumber} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                            ...
+                          </span>
+                        );
+                      }
+                      return null; // Hide other page numbers
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNumber}
+                        onClick={() => handlePageChange(pageNumber)}
+                        className={`relative inline-flex items-center px-4 py-2 border ${
+                          pagination.page === pageNumber
+                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                        } text-sm font-medium`}
+                      >
+                        {pageNumber}
+                      </button>
+                    );
+                  })}
+                  
+                  <button
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={pagination.page === pagination.pages}
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <span className="sr-only">Next</span>
+                    <FiChevronRight className="h-5 w-5" />
+                  </button>
+                </nav>
+              </div>
             </div>
           </div>
         )}
