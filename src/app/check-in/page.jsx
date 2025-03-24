@@ -248,7 +248,7 @@ export default function ScanPage() {
           {!isScanning && !scanResult && (
             <div className="flex flex-col items-center justify-center p-6 text-center">
               <div className="w-20 h-20 rounded-full bg-[#3549b1] bg-opacity-10 flex items-center justify-center mb-4">
-                <FaCamera size={36} className="text-[#3549b1]" />
+                <FaCamera size={36} className="text-white" />
               </div>
               <h3 className="text-lg font-medium text-white mb-2">Kamera Tidak Aktif</h3>
               <p className="text-gray-300 mb-6 text-sm">
