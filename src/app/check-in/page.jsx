@@ -3,8 +3,14 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner, FaMapMarkerAlt } from 'react-icons/fa';
 import Swal from 'sweetalert2';
-import { Html5Qrcode } from 'html5-qrcode';
+import dynamic from 'next/dynamic';
 import AttendanceService from '../api/attendance_service';
+
+// Dynamically import the QrCodeScanner component with no SSR
+const QrCodeScanner = dynamic(
+  () => import('../../components/QrCodeScanner'),
+  { ssr: false }
+);
 
 export default function ScanPage() {
   const [hasPermission, setHasPermission] = useState(null);
@@ -14,8 +20,6 @@ export default function ScanPage() {
   const [userId, setUserId] = useState(null);
   const [locationData, setLocationData] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
-  const html5QrCodeRef = useRef(null);
-  const scannerDivRef = useRef(null);
   
   // Get user ID from local storage on component mount
   useEffect(() => {
@@ -39,13 +43,6 @@ export default function ScanPage() {
       console.error('Error parsing user data from localStorage:', error);
       setUserId("0181871e-c34c-4b7b-8467-96b7108b1429");
     }
-  }, []);
-  
-  // Clean up scanner instance when component unmounts
-  useEffect(() => {
-    return () => {
-      stopScanning();
-    };
   }, []);
   
   // Get current location
@@ -81,68 +78,18 @@ export default function ScanPage() {
     });
   };
 
-  // Start the QR scanner
-  const startScanner = () => {
-    if (!scannerDivRef.current) return;
-    
-    try {
-      const html5QrCode = new Html5Qrcode("qr-reader");
-      html5QrCodeRef.current = html5QrCode;
-      
-      const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
-        formatsToSupport: [Html5Qrcode.FORMATS.QR_CODE]
-      };
-      
-      html5QrCode.start(
-        { facingMode: "environment" },
-        config,
-        onScanSuccess,
-        onScanFailure
-      )
-      .then(() => {
-        setHasPermission(true);
-        setScanMessage('Posisikan QR Code dalam bingkai');
-      })
-      .catch((err) => {
-        console.error("Failed to start scanner", err);
-        setHasPermission(false);
-        setIsScanning(false);
-        Swal.fire({
-          icon: 'error',
-          title: 'Akses Kamera Gagal',
-          text: 'Tidak dapat mengakses kamera. Pastikan Anda memberikan izin kamera untuk aplikasi ini.',
-          confirmButtonColor: '#3549b1',
-        });
-      });
-    } catch (err) {
-      console.error("Error initializing scanner:", err);
-      setHasPermission(false);
-      setIsScanning(false);
-    }
-  };
-  
   // Handle successful QR scan
-  const onScanSuccess = (decodedText) => {
+  const handleScanSuccess = (decodedText) => {
     if (!isScanning) return;
     
-    try {
-      setScanMessage('QR Code terdeteksi!');
-      setTimeout(() => {
-        stopScanning();
-        processAttendance(decodedText);
-      }, 300);
-    } catch (error) {
-      console.error("Error handling scan success:", error);
-    }
+    setScanMessage('QR Code terdeteksi!');
+    setIsScanning(false);
+    processAttendance(decodedText);
   };
   
   // Handle QR scan failure
-  const onScanFailure = (error) => {
+  const handleScanFailure = (error) => {
     // Don't show errors for normal scanning attempts
-    // This will be called very frequently when no QR code is in view
     console.debug("QR scan attempt failed", error);
   };
 
@@ -237,10 +184,7 @@ export default function ScanPage() {
       
       // Then start camera
       setIsScanning(true);
-      // The scanner will initialize after the div is rendered
-      setTimeout(() => {
-        startScanner();
-      }, 100);
+      setHasPermission(true);
     } catch (error) {
       console.error('Error preparing scan:', error);
       Swal.fire({
@@ -256,7 +200,7 @@ export default function ScanPage() {
   
   // Handle scan failure
   const handleScanFailed = (message) => {
-    stopScanning();
+    setIsScanning(false);
     Swal.fire({
       icon: 'error',
       title: 'Scan Gagal',
@@ -268,25 +212,6 @@ export default function ScanPage() {
         prepareScanning();
       }
     });
-  };
-  
-  // Stop scanning
-  const stopScanning = () => {
-    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-      html5QrCodeRef.current.stop()
-        .then(() => {
-          console.log('Scanner stopped');
-        })
-        .catch(err => {
-          console.error('Error stopping scanner:', err);
-        })
-        .finally(() => {
-          setIsScanning(false);
-          html5QrCodeRef.current = null;
-        });
-    } else {
-      setIsScanning(false);
-    }
   };
 
   return (
@@ -347,12 +272,13 @@ export default function ScanPage() {
           
           {isScanning && (
             <>
-              {/* Html5QrCode container div */}
-              <div 
-                id="qr-reader" 
-                ref={scannerDivRef}
-                className="w-full h-full absolute inset-0 z-10"
-              ></div>
+              {/* Use the QrCodeScanner component */}
+              <div className="w-full h-full absolute inset-0 z-10">
+                <QrCodeScanner
+                  onScanSuccess={handleScanSuccess}
+                  onScanFailure={handleScanFailure}
+                />
+              </div>
               
               {/* Custom scanning overlay */}
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
@@ -382,7 +308,7 @@ export default function ScanPage() {
         {/* Cancel button - only show when scanning */}
         {isScanning && (
           <button 
-            onClick={stopScanning} 
+            onClick={() => setIsScanning(false)} 
             className="mt-6 py-4 px-6 bg-white border border-gray-300 text-gray-700 rounded-full font-medium shadow-md flex items-center justify-center mx-auto hover:bg-gray-100 transition-colors z-30"
           >
             Batal
@@ -390,7 +316,7 @@ export default function ScanPage() {
         )}
       </main>
       
-      {/* Add global styles for animations and to hide HTML5QrCode elements we don't want */}
+      {/* Add global styles for animations */}
       <style jsx global>{`
         @keyframes scan {
           0% { top: 0; }
@@ -401,29 +327,7 @@ export default function ScanPage() {
           animation: scan 1.5s linear infinite;
         }
         
-        /* Hide unwanted HTML5QRCode elements */
-        #qr-reader__status_span {
-          display: none !important;
-        }
-        #qr-reader__dashboard_section_swaplink {
-          display: none !important;
-        }
-        #qr-reader__scan_region img {
-          display: none !important;
-        }
-        #qr-reader__dashboard_section_csr button {
-          visibility: hidden;
-          height: 0;
-          padding: 0;
-          margin: 0;
-          border: none;
-        }
-        #qr-reader video {
-          width: 100% !important;
-          height: auto !important;
-          object-fit: cover !important;
-          border: none !important;
-        }
+        /* Styling for QR scanner container */
         #qr-reader {
           border: none !important;
           padding: 0 !important;
@@ -431,8 +335,20 @@ export default function ScanPage() {
           width: 100% !important;
           height: 100% !important;
         }
-        #qr-reader__dashboard_section {
-          padding: 0 !important;
+        #qr-reader video {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+          border: none !important;
+        }
+        #qr-reader__dashboard_section_csr button {
+          visibility: hidden;
+        }
+        #qr-reader__status_span {
+          display: none !important;
+        }
+        #qr-reader__dashboard_section_swaplink {
+          display: none !important;
         }
       `}</style>
     </div>
