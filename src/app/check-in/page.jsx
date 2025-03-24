@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner, FaMapMarkerAlt } from 'react-icons/fa';
 import Swal from 'sweetalert2';
-import { QrScanner } from '@yudiel/react-qr-scanner';
+import { Html5Qrcode } from 'html5-qrcode';
 import AttendanceService from '../api/attendance_service';
 
 export default function ScanPage() {
@@ -14,6 +14,8 @@ export default function ScanPage() {
   const [userId, setUserId] = useState(null);
   const [locationData, setLocationData] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const html5QrCodeRef = useRef(null);
+  const scannerDivRef = useRef(null);
   
   // Get user ID from local storage on component mount
   useEffect(() => {
@@ -37,6 +39,13 @@ export default function ScanPage() {
       console.error('Error parsing user data from localStorage:', error);
       setUserId("0181871e-c34c-4b7b-8467-96b7108b1429");
     }
+  }, []);
+  
+  // Clean up scanner instance when component unmounts
+  useEffect(() => {
+    return () => {
+      stopScanning();
+    };
   }, []);
   
   // Get current location
@@ -72,10 +81,74 @@ export default function ScanPage() {
     });
   };
 
+  // Start the QR scanner
+  const startScanner = () => {
+    if (!scannerDivRef.current) return;
+    
+    try {
+      const html5QrCode = new Html5Qrcode("qr-reader");
+      html5QrCodeRef.current = html5QrCode;
+      
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+        formatsToSupport: [Html5Qrcode.FORMATS.QR_CODE]
+      };
+      
+      html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        onScanSuccess,
+        onScanFailure
+      )
+      .then(() => {
+        setHasPermission(true);
+        setScanMessage('Posisikan QR Code dalam bingkai');
+      })
+      .catch((err) => {
+        console.error("Failed to start scanner", err);
+        setHasPermission(false);
+        setIsScanning(false);
+        Swal.fire({
+          icon: 'error',
+          title: 'Akses Kamera Gagal',
+          text: 'Tidak dapat mengakses kamera. Pastikan Anda memberikan izin kamera untuk aplikasi ini.',
+          confirmButtonColor: '#3549b1',
+        });
+      });
+    } catch (err) {
+      console.error("Error initializing scanner:", err);
+      setHasPermission(false);
+      setIsScanning(false);
+    }
+  };
+  
+  // Handle successful QR scan
+  const onScanSuccess = (decodedText) => {
+    if (!isScanning) return;
+    
+    try {
+      setScanMessage('QR Code terdeteksi!');
+      setTimeout(() => {
+        stopScanning();
+        processAttendance(decodedText);
+      }, 300);
+    } catch (error) {
+      console.error("Error handling scan success:", error);
+    }
+  };
+  
+  // Handle QR scan failure
+  const onScanFailure = (error) => {
+    // Don't show errors for normal scanning attempts
+    // This will be called very frequently when no QR code is in view
+    console.debug("QR scan attempt failed", error);
+  };
+
   // Process QR code data and send to API
   const processAttendance = async (qrData) => {
     try {
-      setIsScanning(false);
       setScanMessage('Memproses absensi...');
       
       // Parse QR code data
@@ -164,7 +237,10 @@ export default function ScanPage() {
       
       // Then start camera
       setIsScanning(true);
-      setHasPermission(true);
+      // The scanner will initialize after the div is rendered
+      setTimeout(() => {
+        startScanner();
+      }, 100);
     } catch (error) {
       console.error('Error preparing scan:', error);
       Swal.fire({
@@ -178,32 +254,9 @@ export default function ScanPage() {
     }
   };
   
-  // Handle successful QR detection from the library
-  const handleDecode = (result) => {
-    if (result && isScanning) {
-      setScanMessage('QR Code terdeteksi!');
-      // Process the result after a small delay to show the detection message
-      setTimeout(() => {
-        processAttendance(result);
-      }, 300);
-    }
-  };
-  
-  // Handle QR scanning errors from the library
-  const handleScanError = (error) => {
-    console.error('QR scan error:', error);
-    // We don't want to show an error for every frame that doesn't contain a QR code
-    // So we only handle critical errors that would stop scanning
-    if (error.name !== 'NotFoundError') {
-      setHasPermission(false);
-      setIsScanning(false);
-      handleScanFailed('Terjadi kesalahan saat memindai. Silakan coba lagi.');
-    }
-  };
-  
   // Handle scan failure
   const handleScanFailed = (message) => {
-    setIsScanning(false);
+    stopScanning();
     Swal.fire({
       icon: 'error',
       title: 'Scan Gagal',
@@ -212,14 +265,28 @@ export default function ScanPage() {
       confirmButtonText: 'Coba Lagi',
     }).then((result) => {
       if (result.isConfirmed) {
-        setIsScanning(true);
+        prepareScanning();
       }
     });
   };
   
   // Stop scanning
   const stopScanning = () => {
-    setIsScanning(false);
+    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+      html5QrCodeRef.current.stop()
+        .then(() => {
+          console.log('Scanner stopped');
+        })
+        .catch(err => {
+          console.error('Error stopping scanner:', err);
+        })
+        .finally(() => {
+          setIsScanning(false);
+          html5QrCodeRef.current = null;
+        });
+    } else {
+      setIsScanning(false);
+    }
   };
 
   return (
@@ -280,29 +347,14 @@ export default function ScanPage() {
           
           {isScanning && (
             <>
-              <div className="absolute inset-0 z-10">
-                <QrScanner
-                  onDecode={handleDecode}
-                  onError={handleScanError}
-                  constraints={{
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                  }}
-                  containerStyle={{
-                    width: '100%',
-                    height: '100%',
-                  }}
-                  scanDelay={300}
-                  videoStyle={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
-                />
-              </div>
+              {/* Html5QrCode container div */}
+              <div 
+                id="qr-reader" 
+                ref={scannerDivRef}
+                className="w-full h-full absolute inset-0 z-10"
+              ></div>
               
-              {/* Scanning overlay */}
+              {/* Custom scanning overlay */}
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
                 {/* QR Frame */}
                 <div className="w-64 h-64 relative border border-white border-opacity-30">
@@ -314,13 +366,6 @@ export default function ScanPage() {
                   
                   {/* Scanning animation */}
                   <div className="absolute top-0 left-0 right-0 h-2 bg-[#3549b1] animate-scan"></div>
-                  
-                  {/* Helper text */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-white text-xs bg-black bg-opacity-40 px-2 py-1 rounded-md">
-                      Arahkan ke QR Code
-                    </div>
-                  </div>
                 </div>
                 
                 {/* Status message */}
@@ -345,7 +390,7 @@ export default function ScanPage() {
         )}
       </main>
       
-      {/* Add some global styles for animations */}
+      {/* Add global styles for animations and to hide HTML5QrCode elements we don't want */}
       <style jsx global>{`
         @keyframes scan {
           0% { top: 0; }
@@ -354,6 +399,40 @@ export default function ScanPage() {
         }
         .animate-scan {
           animation: scan 1.5s linear infinite;
+        }
+        
+        /* Hide unwanted HTML5QRCode elements */
+        #qr-reader__status_span {
+          display: none !important;
+        }
+        #qr-reader__dashboard_section_swaplink {
+          display: none !important;
+        }
+        #qr-reader__scan_region img {
+          display: none !important;
+        }
+        #qr-reader__dashboard_section_csr button {
+          visibility: hidden;
+          height: 0;
+          padding: 0;
+          margin: 0;
+          border: none;
+        }
+        #qr-reader video {
+          width: 100% !important;
+          height: auto !important;
+          object-fit: cover !important;
+          border: none !important;
+        }
+        #qr-reader {
+          border: none !important;
+          padding: 0 !important;
+          background: transparent !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+        #qr-reader__dashboard_section {
+          padding: 0 !important;
         }
       `}</style>
     </div>
