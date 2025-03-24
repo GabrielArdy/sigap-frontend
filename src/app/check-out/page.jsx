@@ -31,11 +31,35 @@ export default function CheckoutPage() {
     });
   };
   
-  // Show error alert
-  const showErrorAlert = (message) => {
+  // Show error alert with detailed error info
+  const showErrorAlert = (message, rawError = null) => {
+    let errorText = message || 'Terjadi kesalahan saat memproses absensi pulang Anda.';
+    let errorDetails = '';
+    
+    // Add raw error details if available
+    if (rawError) {
+      if (typeof rawError === 'string') {
+        errorDetails = rawError;
+      } else if (typeof rawError === 'object') {
+        try {
+          errorDetails = JSON.stringify(rawError, null, 2);
+        } catch (e) {
+          errorDetails = 'Error: ' + Object.prototype.toString.call(rawError);
+        }
+      }
+    }
+    
     Swal.fire({
       title: 'Gagal Absen Pulang',
-      text: message || 'Terjadi kesalahan saat memproses absensi pulang Anda.',
+      html: `
+        <div class="text-left">
+          <p>${errorText}</p>
+          ${errorDetails ? `<div class="mt-3 pt-3 border-t">
+            <p class="font-semibold text-sm text-red-600 mb-1">Detail Error:</p>
+            <pre class="text-xs bg-gray-100 p-2 rounded overflow-auto" style="max-height: 150px;">${errorDetails}</pre>
+          </div>` : ''}
+        </div>
+      `,
       icon: 'error',
       confirmButtonColor: '#3549b1',
       confirmButtonText: 'Coba Lagi'
@@ -128,14 +152,20 @@ export default function CheckoutPage() {
       }
     } catch (error) {
       console.error('Error processing scan:', error);
-      showErrorAlert(error.message);
+      
+      // Show detailed error including raw response data
+      showErrorAlert(
+        error.message || 'Terjadi kesalahan saat memproses absensi', 
+        error.response ? error.response.data : error
+      );
+      
       setIsScanning(false);
     } finally {
       setIsProcessing(false);
     }
   };
   
-  // Handle QR scan failure
+  // Handle QR scan failure with detailed error
   const handleScanFailure = (error) => {
     console.error('QR Scan error:', error);
     setScanMessage('Tidak dapat memindai QR Code. Silakan coba lagi.');
@@ -159,7 +189,7 @@ export default function CheckoutPage() {
       setScanMessage('Tidak dapat mengakses kamera. Berikan izin kamera untuk melanjutkan.');
       setIsScanning(false);
       
-      showErrorAlert('Tidak dapat mengakses kamera. Pastikan Anda memberikan izin kamera.');
+      showErrorAlert('Tidak dapat mengakses kamera. Pastikan Anda memberikan izin kamera.', err);
     }
   };
   
@@ -299,7 +329,7 @@ export default function CheckoutPage() {
           <button 
             onClick={() => {
               stopCamera();
-              showErrorAlert('Proses scan dibatalkan');
+              showErrorAlert('Proses scan dibatalkan', 'Proses dibatalkan oleh pengguna');
             }} 
             className="mt-6 py-4 px-6 bg-white border border-gray-300 text-gray-700 rounded-full font-medium shadow-md flex items-center justify-center mx-auto hover:bg-gray-100 transition-colors z-30"
           >
