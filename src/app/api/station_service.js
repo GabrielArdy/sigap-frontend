@@ -42,12 +42,15 @@ const StationService = {
             return error.response ? error.response.data : { status: "error", message: error.message };
         }
     },
-    fetchQRCode: async (stationId) => {
+    fetchQRCode: async (data) => {
         try {
-            const response = await api.get(`/qr/generate`, {stationId});
+            const response = await api.get(`/qr/generate`, { params: data });
             return response.data;
         } catch (error) {
-            return error.response.data;
+            return error.response ? error.response.data : { 
+                success: false, 
+                message: error.message || "Failed to fetch QR code" 
+            };
         }
     }
 }

@@ -1,53 +1,69 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import QRCode from "react-qr-code";
-import { Spin, notification, Button } from "antd";
+import { Spin, notification, Button, Image } from "antd";
 import { useRouter } from "next/navigation";
+import StationService from "../../api/station_service";
 
 const QRCodePage = () => {
-  const [qrCodeValue, setQrCodeValue] = useState("");
+  const [qrCodeData, setQrCodeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
-  const [qrSize, setQrSize] = useState(300); // Increased default size
+  const [qrSize, setQrSize] = useState(300);
   const containerRef = useRef(null);
-  // Add station information state
   const [stationInfo, setStationInfo] = useState(null);
   const router = useRouter();
+
+  // Function to fetch station information
+  const fetchStationInfo = async (stationId) => {
+    try {
+      const response = await StationService.getAll();
+      
+      if (response.status === "success") {
+        const station = response.data.find(s => s.stationId === stationId);
+        if (station) {
+          setStationInfo(station);
+          return station;
+        } else {
+          throw new Error("Station not found");
+        }
+      } else {
+        throw new Error(response.message || "Failed to fetch station information");
+      }
+    } catch (error) {
+      notification.error({
+        message: "Error",
+        description: error.message || "Failed to fetch station information"
+      });
+      return null;
+    }
+  };
 
   // Function to fetch new QR code data
   const fetchQRCodeData = async () => {
     setLoading(true);
     try {
-      if (!stationInfo) {
+      const stationId = localStorage.getItem('sid');
+      
+      if (!stationId) {
         throw new Error("No station is activated");
       }
 
-      // This is a dummy implementation
-      // Replace with actual API call when ready
-      const dummyResponse = {
-        success: true,
-        data: {
-          // Include stationId in the QR data
-          qrValue: JSON.stringify({
-            token: `attendance-${new Date().getTime()}`,
-            stationId: stationInfo.id,
-            timestamp: new Date().toISOString()
-          }),
-          timestamp: new Date().toISOString()
+      // Fetch QR code from API
+      const response = await StationService.fetchQRCode({ stationId });
+      
+      if (response.success) {
+        setQrCodeData(response.data);
+        setTimeLeft(response.data.expiresIn || 300);
+        
+        // If we don't have station info yet, fetch it
+        if (!stationInfo) {
+          await fetchStationInfo(stationId);
         }
-      };
-
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      if (dummyResponse.success) {
-        setQrCodeValue(dummyResponse.data.qrValue);
-        setTimeLeft(300); // Reset timer to 5 minutes
       } else {
         notification.error({
           message: "Error",
-          description: "Failed to fetch QR code data"
+          description: response.message || "Failed to fetch QR code data"
         });
       }
     } catch (error) {
@@ -62,58 +78,30 @@ const QRCodePage = () => {
 
   // Initial fetch when component mounts
   useEffect(() => {
-    // Function to fetch station information
-    const fetchStationInfo = async () => {
-      try {
-        // Get station ID from localStorage
-        const stationId = localStorage.getItem('sid');
-        
-        if (!stationId) {
-          notification.warning({
-            message: "No Station Activated",
-            description: "Please activate a station first"
-          });
-          router.push('/station/activated');
-          return;
-        }
-        
-        // Fetch station information using the station ID
-        // This is a dummy implementation - replace with actual API call
-        // For now using dummy data that simulates fetching the station info
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Dummy station data mapping
-        const stationData = {
-          "ST001": { id: "ST001", name: "Main Entrance", location: "Building A" },
-          "ST002": { id: "ST002", name: "Side Entrance", location: "Building B" },
-          "ST003": { id: "ST003", name: "Staff Entry", location: "Building C" },
-          "ST004": { id: "ST004", name: "VIP Entrance", location: "Main Hall" },
-        }[stationId] || null;
-        
-        if (!stationData) {
-          throw new Error("Station information not found");
-        }
-        
-        // Set station info
-        setStationInfo(stationData);
-      } catch (error) {
-        notification.error({
-          message: "Error",
-          description: error.message || "Failed to fetch station information"
-        });
+    // Get station ID from localStorage
+    const stationId = localStorage.getItem('sid');
+    
+    if (!stationId) {
+      notification.warning({
+        message: "No Station Activated",
+        description: "Please activate a station first"
+      });
+      router.push('/station/activated');
+      return;
+    }
+
+    // First fetch station info, then QR code
+    const initializeData = async () => {
+      const station = await fetchStationInfo(stationId);
+      if (station) {
+        fetchQRCodeData();
+      } else {
         router.push('/station/activated');
       }
     };
-
-    fetchStationInfo();
+    
+    initializeData();
   }, [router]);
-
-  // Fetch QR code after station info is loaded
-  useEffect(() => {
-    if (stationInfo) {
-      fetchQRCodeData();
-    }
-  }, [stationInfo]);
 
   // Timer countdown effect
   useEffect(() => {
@@ -191,12 +179,12 @@ const QRCodePage = () => {
         <div className="text-center mb-1">
           <div className="flex items-center justify-center mb-1">
             <div className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-              Station ID: {stationInfo.id}
+              Station ID: {stationInfo.stationId}
             </div>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-blue-600">{stationInfo.name}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-blue-600">{stationInfo.stationName}</h1>
           <p className="text-gray-500 text-xs sm:text-sm">
-            {stationInfo.location} • Attendance Station
+            Status: {stationInfo.stationStatus}
           </p>
           <button 
             onClick={handleChangeStation}
@@ -215,14 +203,18 @@ const QRCodePage = () => {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full py-4 px-2">
-            {/* QR Code Container with increased size and better centering */}
+            {/* QR Code display using the base64 image from API */}
             <div className="mb-4 p-4 bg-white rounded-lg border-2 border-blue-100 flex items-center justify-center">
-              <QRCode 
-                value={qrCodeValue} 
-                size={qrSize} 
-                level="H"
-                className="shadow-sm" 
-              />
+              {qrCodeData && (
+                <Image
+                  src={qrCodeData.qrCode}
+                  alt="QR Code"
+                  width={qrSize}
+                  height={qrSize}
+                  style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  preview={false}
+                />
+              )}
             </div>
 
             {/* Timer Section - now separate from QR for better space management */}
