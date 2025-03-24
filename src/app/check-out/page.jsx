@@ -19,6 +19,22 @@ export default function CheckoutPage() {
   const [scanMessage, setScanMessage] = useState('Posisikan QR Code dalam bingkai');
   const [userLocation, setUserLocation] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [userData, setUserData] = useState(null);
+  
+  // Fetch user data from localStorage on component mount
+  useEffect(() => {
+    try {
+      const userString = localStorage.getItem('user');
+      if (userString) {
+        const parsedUser = JSON.parse(userString);
+        setUserData(parsedUser);
+      } else {
+        console.error('User data not found in localStorage');
+      }
+    } catch (error) {
+      console.error('Error parsing user data from localStorage:', error);
+    }
+  }, []);
   
   // Show success alert
   const showSuccessAlert = (result) => {
@@ -110,10 +126,26 @@ export default function CheckoutPage() {
         throw new Error('QR Code sudah kedaluwarsa');
       }
       
-      // Get user ID from localStorage (you may want to use a more secure approach)
-      const userId = localStorage.getItem('userId');
-      if (!userId) {
-        throw new Error('User tidak terautentikasi');
+      // Get user ID from userData state (populated from localStorage)
+      let userId;
+      if (userData && userData.userId) {
+        userId = userData.userId;
+      } else {
+        // Try to get it directly from localStorage as fallback
+        try {
+          const userString = localStorage.getItem('user');
+          if (userString) {
+            const parsedUser = JSON.parse(userString);
+            userId = parsedUser.userId;
+          }
+        } catch (e) {
+          console.error('Error accessing userId from localStorage:', e);
+        }
+        
+        // If still no userId, throw error
+        if (!userId) {
+          throw new Error('User tidak terautentikasi');
+        }
       }
       
       // Get current location if not already available
@@ -131,6 +163,8 @@ export default function CheckoutPage() {
         },
         qrData
       };
+      
+      console.log('Sending checkout data:', attendanceData);
       
       // Send checkout data to API
       const response = await AttendanceService.recordCheckOutTime(attendanceData);
@@ -226,6 +260,11 @@ export default function CheckoutPage() {
           </h2>
           <p className="text-gray-600 text-sm">
             Arahkan kamera ke QR Code pada anjungan absensi untuk menyelesaikan sesi kerja hari ini.
+            {userData && (
+              <span className="flex items-center mt-2 text-blue-600">
+                <span className="mr-1">👤</span> {userData.firstName} {userData.lastName}
+              </span>
+            )}
             {userLocation && (
               <span className="flex items-center mt-2 text-green-600">
                 <FaMapMarkerAlt className="mr-1" /> Lokasi terdeteksi
