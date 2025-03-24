@@ -44,7 +44,7 @@ const StationService = {
     },
     fetchQRCode: async (data) => {
         try {
-            const response = await api.get(`/qr/generate`, { params: data });
+            const response = await api.get(`/qr/generate`, { stationId: data });
             return response.data;
         } catch (error) {
             return error.response ? error.response.data : { 
