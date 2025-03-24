@@ -19,67 +19,55 @@ export default function CheckoutPage() {
   const [scanMessage, setScanMessage] = useState('Posisikan QR Code dalam bingkai');
   const [userLocation, setUserLocation] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [userData, setUserData] = useState(null);
   
-  // Fetch user data from localStorage on component mount
-  useEffect(() => {
-    try {
-      const userString = localStorage.getItem('user');
-      if (userString) {
-        const parsedUser = JSON.parse(userString);
-        setUserData(parsedUser);
-      } else {
-        console.error('User data not found in localStorage');
-      }
-    } catch (error) {
-      console.error('Error parsing user data from localStorage:', error);
-    }
-  }, []);
-  
-  // Show success alert
+  // Show success alert - simplified similar to check-in page
   const showSuccessAlert = (result) => {
+    const userFullName = getUserName();
+    
     Swal.fire({
-      title: 'Absen Pulang Berhasil!',
-      text: `Terima kasih atas kerja keras Anda hari ini. Durasi kerja: ${result.duration}`,
       icon: 'success',
+      title: 'Absen Pulang Berhasil',
+      html: `
+        <div class="text-left">
+          <p><strong>Lokasi:</strong> ${result.location || 'Terdeteksi'}</p>
+          <p><strong>Terminal:</strong> ${result.terminal}</p>
+          <p><strong>Waktu:</strong> ${new Date(result.timestamp).toLocaleTimeString('id-ID')}</p>
+        </div>
+      `,
+      confirmButtonText: 'Kembali ke Beranda',
       confirmButtonColor: '#3549b1',
-      confirmButtonText: 'OK'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        window.location.href = '/home';
+      }
     });
   };
   
-  // Show error alert with detailed error info
-  const showErrorAlert = (message, rawError = null) => {
-    let errorText = message || 'Terjadi kesalahan saat memproses absensi pulang Anda.';
-    let errorDetails = '';
-    
-    // Add raw error details if available
-    if (rawError) {
-      if (typeof rawError === 'string') {
-        errorDetails = rawError;
-      } else if (typeof rawError === 'object') {
-        try {
-          errorDetails = JSON.stringify(rawError, null, 2);
-        } catch (e) {
-          errorDetails = 'Error: ' + Object.prototype.toString.call(rawError);
-        }
-      }
-    }
-    
+  // Show error alert without raw error details
+  const showErrorAlert = (message) => {
     Swal.fire({
       title: 'Gagal Absen Pulang',
-      html: `
-        <div class="text-left">
-          <p>${errorText}</p>
-          ${errorDetails ? `<div class="mt-3 pt-3 border-t">
-            <p class="font-semibold text-sm text-red-600 mb-1">Detail Error:</p>
-            <pre class="text-xs bg-gray-100 p-2 rounded overflow-auto" style="max-height: 150px;">${errorDetails}</pre>
-          </div>` : ''}
-        </div>
-      `,
+      text: message || 'Terjadi kesalahan saat memproses absensi pulang Anda.',
       icon: 'error',
       confirmButtonColor: '#3549b1',
       confirmButtonText: 'Coba Lagi'
     });
+  };
+  
+  // Helper function to get user name
+  const getUserName = () => {
+    try {
+      const userString = localStorage.getItem('user');
+      if (userString) {
+        const userData = JSON.parse(userString);
+        if (userData.firstName) {
+          return `${userData.firstName} ${userData.lastName || ''}`.trim();
+        }
+      }
+      return "Pengguna";
+    } catch (error) {
+      return "Pengguna";
+    }
   };
 
   // Get user's current location
@@ -91,7 +79,6 @@ export default function CheckoutPage() {
           setUserLocation({ latitude, longitude });
         },
         (error) => {
-          console.error('Error getting location:', error);
           showErrorAlert('Tidak dapat mengakses lokasi. Pastikan GPS aktif dan berikan izin.');
         },
         { enableHighAccuracy: true }
@@ -126,26 +113,21 @@ export default function CheckoutPage() {
         throw new Error('QR Code sudah kedaluwarsa');
       }
       
-      // Get user ID from userData state (populated from localStorage)
+      // Get user ID from localStorage
       let userId;
-      if (userData && userData.userId) {
-        userId = userData.userId;
-      } else {
-        // Try to get it directly from localStorage as fallback
-        try {
-          const userString = localStorage.getItem('user');
-          if (userString) {
-            const parsedUser = JSON.parse(userString);
-            userId = parsedUser.userId;
-          }
-        } catch (e) {
-          console.error('Error accessing userId from localStorage:', e);
+      try {
+        const userString = localStorage.getItem('user');
+        if (userString) {
+          const parsedUser = JSON.parse(userString);
+          userId = parsedUser.userId;
         }
-        
-        // If still no userId, throw error
-        if (!userId) {
-          throw new Error('User tidak terautentikasi');
-        }
+      } catch (e) {
+        // Silently handle error
+      }
+      
+      // If still no userId, throw error
+      if (!userId) {
+        throw new Error('User tidak terautentikasi');
       }
       
       // Get current location if not already available
@@ -164,8 +146,6 @@ export default function CheckoutPage() {
         qrData
       };
       
-      console.log('Sending checkout data:', attendanceData);
-      
       // Send checkout data to API
       const response = await AttendanceService.recordCheckOutTime(attendanceData);
       
@@ -174,34 +154,24 @@ export default function CheckoutPage() {
           success: true,
           location: response.data.location || "Tidak tersedia",
           terminal: qrData.stationId || "Unknown",
-          timestamp: response.data.checkOutTime || new Date().toISOString(),
-          duration: response.data.duration || "N/A"
+          timestamp: response.data.checkOutTime || new Date().toISOString()
         };
         
-        setScanResult(result);
         setIsScanning(false);
         showSuccessAlert(result);
       } else {
         throw new Error(response.message || 'Gagal melakukan absen pulang');
       }
     } catch (error) {
-      console.error('Error processing scan:', error);
-      
-      // Show detailed error including raw response data
-      showErrorAlert(
-        error.message || 'Terjadi kesalahan saat memproses absensi', 
-        error.response ? error.response.data : error
-      );
-      
+      showErrorAlert(error.message || 'Terjadi kesalahan saat memproses absensi');
       setIsScanning(false);
     } finally {
       setIsProcessing(false);
     }
   };
   
-  // Handle QR scan failure with detailed error
+  // Handle QR scan failure
   const handleScanFailure = (error) => {
-    console.error('QR Scan error:', error);
     setScanMessage('Tidak dapat memindai QR Code. Silakan coba lagi.');
   };
   
@@ -218,12 +188,11 @@ export default function CheckoutPage() {
       setHasPermission(true);
       setScanMessage('Posisikan QR Code dalam bingkai');
     } catch (err) {
-      console.error('Error preparing scan:', err);
       setHasPermission(false);
       setScanMessage('Tidak dapat mengakses kamera. Berikan izin kamera untuk melanjutkan.');
       setIsScanning(false);
       
-      showErrorAlert('Tidak dapat mengakses kamera. Pastikan Anda memberikan izin kamera.', err);
+      showErrorAlert('Tidak dapat mengakses kamera. Pastikan Anda memberikan izin kamera.');
     }
   };
   
@@ -260,11 +229,6 @@ export default function CheckoutPage() {
           </h2>
           <p className="text-gray-600 text-sm">
             Arahkan kamera ke QR Code pada anjungan absensi untuk menyelesaikan sesi kerja hari ini.
-            {userData && (
-              <span className="flex items-center mt-2 text-blue-600">
-                <span className="mr-1">👤</span> {userData.firstName} {userData.lastName}
-              </span>
-            )}
             {userLocation && (
               <span className="flex items-center mt-2 text-green-600">
                 <FaMapMarkerAlt className="mr-1" /> Lokasi terdeteksi
@@ -275,7 +239,7 @@ export default function CheckoutPage() {
         
         {/* Camera View */}
         <div className="relative bg-black rounded-xl overflow-hidden shadow-lg flex-1 min-h-[60vh] flex flex-col items-center justify-center">
-          {!isScanning && !scanResult && (
+          {!isScanning && (
             <div className="flex flex-col items-center justify-center p-6 text-center">
               <div className="w-20 h-20 rounded-full bg-[#3549b1] bg-opacity-10 flex items-center justify-center mb-4">
                 <FaCamera size={36} className="text-[#3549b1]" />
@@ -326,41 +290,6 @@ export default function CheckoutPage() {
               </div>
             </>
           )}
-          
-          {scanResult && (
-            <div className="p-6 text-center">
-              <div className="w-20 h-20 rounded-full bg-orange-100 mx-auto flex items-center justify-center mb-4">
-                <FaDoorOpen className="w-10 h-10 text-orange-500" />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Absen Pulang Berhasil</h2>
-              <p className="text-gray-300 mb-6">Terima kasih atas kerja keras Anda hari ini</p>
-              <div className="bg-white bg-opacity-10 rounded-lg p-4 mb-6">
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-300">Lokasi:</span>
-                  <span className="text-white font-medium">{scanResult.location}</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-300">Terminal:</span>
-                  <span className="text-white font-medium">{scanResult.terminal}</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-300">Waktu Pulang:</span>
-                  <span className="text-white font-medium">
-                    {new Date(scanResult.timestamp).toLocaleTimeString('id-ID')}
-                  </span>
-                </div>
-                <div className="flex justify-between mt-2 pt-2 border-t border-white border-opacity-10">
-                  <span className="text-gray-300">Durasi Kerja:</span>
-                  <span className="text-white font-medium">{scanResult.duration}</span>
-                </div>
-              </div>
-              <Link href="/home">
-                <button className="w-full py-3 bg-[#3549b1] text-white rounded-lg font-medium">
-                  Kembali ke Beranda
-                </button>
-              </Link>
-            </div>
-          )}
         </div>
         
         {/* Cancel button - only show when scanning */}
@@ -368,7 +297,7 @@ export default function CheckoutPage() {
           <button 
             onClick={() => {
               stopCamera();
-              showErrorAlert('Proses scan dibatalkan', 'Proses dibatalkan oleh pengguna');
+              showErrorAlert('Proses scan dibatalkan');
             }} 
             className="mt-6 py-4 px-6 bg-white border border-gray-300 text-gray-700 rounded-full font-medium shadow-md flex items-center justify-center mx-auto hover:bg-gray-100 transition-colors z-30"
           >
