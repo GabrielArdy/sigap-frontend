@@ -12,6 +12,8 @@ const QRCodePage = () => {
   const [qrSize, setQrSize] = useState(300);
   const containerRef = useRef(null);
   const [stationInfo, setStationInfo] = useState(null);
+  const [errorState, setErrorState] = useState(false);
+  const [retryTimer, setRetryTimer] = useState(null);
   const router = useRouter();
 
   // Function to fetch station information
@@ -39,6 +41,16 @@ const QRCodePage = () => {
     }
   };
 
+  // Function to setup retry mechanism
+  const setupRetryTimer = () => {
+    clearTimeout(retryTimer);
+    const timer = setTimeout(() => {
+      fetchQRCodeData();
+    }, 60000); // Retry after 1 minute
+    setRetryTimer(timer);
+    return timer;
+  };
+
   // Function to fetch new QR code data
   const fetchQRCodeData = async () => {
     setLoading(true);
@@ -52,7 +64,9 @@ const QRCodePage = () => {
       // Fetch QR code from API
       const response = await StationService.fetchQRCode({ stationId });
       
+      // Check if response is successful
       if (response.success) {
+        setErrorState(false);
         setQrCodeData(response.data);
         setTimeLeft(response.data.expiresIn || 300);
         
@@ -60,21 +74,34 @@ const QRCodePage = () => {
         if (!stationInfo) {
           await fetchStationInfo(stationId);
         }
+        
+        // Clear any existing retry timer
+        clearTimeout(retryTimer);
       } else {
-        notification.error({
-          message: "Error",
-          description: response.message || "Failed to fetch QR code data"
-        });
+        throw new Error(response.message || "Failed to fetch QR code data");
       }
     } catch (error) {
+      setErrorState(true);
       notification.error({
         message: "Error",
         description: error.message || "Failed to connect to server"
       });
+      
+      // Setup retry timer
+      setupRetryTimer();
     } finally {
       setLoading(false);
     }
   };
+
+  // Cleanup retry timer on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
+    };
+  }, [retryTimer]);
 
   // Initial fetch when component mounts
   useEffect(() => {
@@ -105,8 +132,8 @@ const QRCodePage = () => {
 
   // Timer countdown effect
   useEffect(() => {
-    if (!stationInfo || timeLeft <= 0) {
-      if (timeLeft <= 0 && stationInfo) {
+    if (!stationInfo || timeLeft <= 0 || errorState) {
+      if (timeLeft <= 0 && stationInfo && !errorState) {
         fetchQRCodeData();
       }
       return;
@@ -117,7 +144,7 @@ const QRCodePage = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft, stationInfo]);
+  }, [timeLeft, stationInfo, errorState]);
 
   // Format time remaining as MM:SS
   const formatTimeLeft = () => {
@@ -156,6 +183,11 @@ const QRCodePage = () => {
   // Function to handle changing the station
   const handleChangeStation = () => {
     router.push('/station/activated');
+  };
+
+  // Function to manually retry fetching QR code
+  const handleRetry = () => {
+    fetchQRCodeData();
   };
 
   if (!stationInfo && !loading) {
@@ -201,6 +233,15 @@ const QRCodePage = () => {
             <Spin size="large" />
             <div className="mt-4 text-gray-600">Loading QR Code...</div>
           </div>
+        ) : errorState ? (
+          <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+            <div className="text-red-500 text-5xl mb-4">❌</div>
+            <h3 className="text-lg font-medium text-red-600 mb-2">Failed to load QR Code</h3>
+            <p className="text-gray-600 mb-6">The system will automatically try again in 1 minute.</p>
+            <div className="text-lg font-medium text-blue-600">
+              Connecting to server...
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full py-4 px-2">
             {/* QR Code display using the base64 image from API */}
@@ -231,7 +272,7 @@ const QRCodePage = () => {
       </div>
       
       <p className="text-xs text-gray-500 mt-1">
-        This QR code refreshes every 5 minutes
+        {errorState ? "Automatic reconnection in progress..." : "This QR code refreshes every 5 minutes"}
       </p>
     </div>
   );
