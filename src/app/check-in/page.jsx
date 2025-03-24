@@ -1,17 +1,186 @@
 'use client'
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner } from 'react-icons/fa';
+import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner, FaMapMarkerAlt } from 'react-icons/fa';
 import Swal from 'sweetalert2';
+import jsQR from 'jsqr';
+import AttendanceService from '../api/attendance_service';
 
 export default function ScanPage() {
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const [hasPermission, setHasPermission] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [scanMessage, setScanMessage] = useState('Posisikan QR Code dalam bingkai');
+  const [userId, setUserId] = useState(null);
+  const [locationData, setLocationData] = useState(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const scanIntervalRef = useRef(null);
   
-  // Start camera when component mounts
+  // Get user ID from local storage on component mount
+  useEffect(() => {
+    try {
+      const userString = localStorage.getItem('user');
+      if (userString) {
+        const userData = JSON.parse(userString);
+        if (userData && userData.userId) {
+          setUserId(userData.userId);
+        } else {
+          // Fallback userId if user data doesn't contain userId
+          console.warn('User data found in localStorage but missing userId');
+          setUserId("0181871e-c34c-4b7b-8467-96b7108b1429");
+        }
+      } else {
+        // Fallback userId if not found in localStorage
+        console.warn('No user data found in localStorage');
+        setUserId("0181871e-c34c-4b7b-8467-96b7108b1429");
+      }
+    } catch (error) {
+      console.error('Error parsing user data from localStorage:', error);
+      setUserId("0181871e-c34c-4b7b-8467-96b7108b1429");
+    }
+  }, []);
+  
+  // Get current location
+  const getCurrentLocation = () => {
+    return new Promise((resolve, reject) => {
+      setIsLoadingLocation(true);
+      if (!navigator.geolocation) {
+        setIsLoadingLocation(false);
+        reject(new Error('Geolocation is not supported by your browser'));
+      } else {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const location = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            };
+            setLocationData(location);
+            setIsLoadingLocation(false);
+            resolve(location);
+          },
+          (error) => {
+            console.error('Geolocation error:', error);
+            setIsLoadingLocation(false);
+            reject(error);
+          },
+          { 
+            enableHighAccuracy: true, 
+            timeout: 10000, 
+            maximumAge: 0 
+          }
+        );
+      }
+    });
+  };
+
+  // Process QR code data and send to API
+  const processAttendance = async (qrData) => {
+    try {
+      stopCamera();
+      setScanMessage('Memproses absensi...');
+      
+      // Parse QR code data
+      const parsedQrData = JSON.parse(qrData);
+      
+      // Use location data we already have
+      let location = locationData;
+      
+      // If location wasn't obtained earlier, try again as fallback
+      if (!location) {
+        try {
+          location = await getCurrentLocation();
+        } catch (error) {
+          console.error('Error getting location during processing:', error);
+          // Use default location as last resort
+          location = { latitude: -6.208800, longitude: 106.845600 };
+        }
+      }
+      
+      // Get user information from localStorage
+      let userFullName = "Pengguna";
+      try {
+        const userString = localStorage.getItem('user');
+        if (userString) {
+          const userData = JSON.parse(userString);
+          if (userData.firstName) {
+            userFullName = `${userData.firstName} ${userData.lastName || ''}`.trim();
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user info:', error);
+      }
+      
+      // Prepare data for API
+      const attendanceData = {
+        userId: userId,
+        scannedAt: new Date().toISOString(),
+        location: {
+          longitude: location.longitude,
+          latitude: location.latitude
+        },
+        qrData: parsedQrData
+      };
+      
+      // Send to API
+      const response = await AttendanceService.recordCheckInTime(attendanceData);
+      
+      if (response.success) {
+        // Show success message with SweetAlert
+        Swal.fire({
+          icon: 'success',
+          title: 'Absensi Berhasil',
+          html: `
+            <div class="text-left">
+              <p><strong>Nama:</strong> ${userFullName}</p>
+              <p><strong>Lokasi:</strong> ${response.data?.location || 'Terdeteksi'}</p>
+              <p><strong>Terminal:</strong> ${parsedQrData.stationId}</p>
+              <p><strong>Waktu:</strong> ${new Date().toLocaleTimeString('id-ID')}</p>
+            </div>
+          `,
+          confirmButtonText: 'Kembali ke Beranda',
+          confirmButtonColor: '#3549b1',
+        }).then((result) => {
+          if (result.isConfirmed) {
+            window.location.href = '/home';
+          }
+        });
+        
+        setScanResult(response.data);
+      } else {
+        // Show error message
+        handleScanFailed(response.message || 'Gagal melakukan absensi');
+      }
+    } catch (error) {
+      console.error('Error processing attendance:', error);
+      handleScanFailed('Format QR Code tidak valid atau terjadi kesalahan saat memproses');
+    }
+  };
+  
+  // Prepare and start scanning
+  const prepareScanning = async () => {
+    try {
+      // First get location
+      setScanMessage('Mendapatkan lokasi...');
+      await getCurrentLocation();
+      
+      // Then start camera
+      await startCamera();
+    } catch (error) {
+      console.error('Error preparing scan:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Akses Lokasi Gagal',
+        text: 'Tidak dapat mengakses lokasi. Pastikan Anda memberikan izin lokasi untuk aplikasi ini.',
+        confirmButtonColor: '#3549b1',
+      });
+      setScanMessage('Gagal mendapatkan lokasi');
+      setIsScanning(false);
+    }
+  };
+  
+  // Start camera and QR scanning
   const startCamera = async () => {
     try {
       setIsScanning(true);
@@ -27,39 +196,18 @@ export default function ScanPage() {
         setHasPermission(true);
         setScanMessage('Posisikan QR Code dalam bingkai');
         
-        // Simulate successful scan after 5 seconds (replace with real QR scanning)
-        setTimeout(() => {
-          const mockResult = {
-            success: true,
-            location: "Kantor Pusat Lt. 3",
-            terminal: "Terminal-AB12",
-            timestamp: new Date().toISOString()
-          };
+        // Start QR code scanning
+        videoRef.current.addEventListener('loadedmetadata', () => {
+          // Create canvas for QR code detection if it doesn't exist
+          if (!canvasRef.current) {
+            canvasRef.current = document.createElement('canvas');
+          }
           
-          // Stop camera first
-          stopCamera();
-          
-          // Show success message with SweetAlert
-          Swal.fire({
-            icon: 'success',
-            title: 'Absensi Berhasil',
-            html: `
-              <div class="text-left">
-                <p><strong>Lokasi:</strong> ${mockResult.location}</p>
-                <p><strong>Terminal:</strong> ${mockResult.terminal}</p>
-                <p><strong>Waktu:</strong> ${new Date(mockResult.timestamp).toLocaleTimeString('id-ID')}</p>
-              </div>
-            `,
-            confirmButtonText: 'Kembali ke Beranda',
-            confirmButtonColor: '#3549b1',
-          }).then((result) => {
-            if (result.isConfirmed) {
-              window.location.href = '/home';
-            }
-          });
-          
-          setScanResult(mockResult);
-        }, 5000);
+          // Start scanning for QR codes
+          scanIntervalRef.current = setInterval(() => {
+            scanQRCode();
+          }, 200); // Scan every 200ms
+        });
       }
     } catch (err) {
       console.error('Error accessing camera:', err);
@@ -77,8 +225,49 @@ export default function ScanPage() {
     }
   };
   
+  // Scan QR code from video feed
+  const scanQRCode = () => {
+    if (!videoRef.current || !canvasRef.current || !isScanning) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    
+    // Set canvas dimensions to video dimensions
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Draw video frame to canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // Get image data from canvas
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    
+    // Scan for QR code
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: "dontInvert",
+    });
+    
+    // If QR code is found
+    if (code) {
+      // Clear the scanning interval
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+        scanIntervalRef.current = null;
+      }
+      
+      // Process the QR code data
+      processAttendance(code.data);
+    }
+  };
+  
   // Stop camera
   const stopCamera = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    
     if (videoRef.current && videoRef.current.srcObject) {
       const tracks = videoRef.current.srcObject.getTracks();
       tracks.forEach(track => track.stop());
@@ -131,6 +320,11 @@ export default function ScanPage() {
           </h2>
           <p className="text-gray-600 text-sm">
             Arahkan kamera ke QR Code pada anjungan absensi untuk melakukan absen masuk/keluar.
+            {locationData && (
+              <span className="flex items-center mt-2 text-green-600">
+                <FaMapMarkerAlt className="mr-1" /> Lokasi terdeteksi
+              </span>
+            )}
           </p>
         </div>
         
@@ -146,10 +340,17 @@ export default function ScanPage() {
                 Aktifkan kamera untuk memulai scan QR Code
               </p>
               <button
-                onClick={startCamera}
-                className="px-6 py-3 bg-[#3549b1] text-white rounded-lg font-medium shadow-lg hover:bg-[#3549b1] transition-colors"
+                onClick={prepareScanning}
+                disabled={isLoadingLocation}
+                className="px-6 py-3 bg-[#3549b1] text-white rounded-lg font-medium shadow-lg hover:bg-[#3549b1] transition-colors disabled:bg-gray-400"
               >
-                Mulai Scan
+                {isLoadingLocation ? (
+                  <>
+                    <FaSpinner className="animate-spin inline mr-2" /> Mendapatkan Lokasi...
+                  </>
+                ) : (
+                  'Mulai Scan'
+                )}
               </button>
             </div>
           )}
