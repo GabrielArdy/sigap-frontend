@@ -46,7 +46,7 @@ const QRCodePage = () => {
     clearTimeout(retryTimer);
     const timer = setTimeout(() => {
       fetchQRCodeData();
-    }, 60000); // Retry after 1 minute
+    }, 3000); // Retry every 3 seconds instead of 60 seconds
     setRetryTimer(timer);
     return timer;
   };
@@ -237,7 +237,7 @@ const QRCodePage = () => {
           <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
             <div className="text-red-500 text-5xl mb-4">❌</div>
             <h3 className="text-lg font-medium text-red-600 mb-2">Failed to load QR Code</h3>
-            <p className="text-gray-600 mb-6">The system will automatically try again in 1 minute.</p>
+            <p className="text-gray-600 mb-6">The system will automatically try again in a few seconds.</p>
             <div className="text-lg font-medium text-blue-600">
               Connecting to server...
             </div>
