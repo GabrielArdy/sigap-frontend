@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Select, Button, Card, notification, Spin } from "antd";
 import { useRouter } from "next/navigation";
+import StationService from "../../api/station_service";
 
 const StationActivation = () => {
   const [stations, setStations] = useState([]);
@@ -28,18 +29,16 @@ const StationActivation = () => {
   const fetchStations = async () => {
     setLoading(true);
     try {
-      // This is a dummy implementation - replace with actual API call
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const response = await StationService.getAll();
       
-      const dummyStations = [
-        { id: "ST001", name: "Main Entrance", location: "Building A" },
-        { id: "ST002", name: "Side Entrance", location: "Building B" },
-        { id: "ST003", name: "Staff Entry", location: "Building C" },
-        { id: "ST004", name: "VIP Entrance", location: "Main Hall" },
-      ];
-      
-      setStations(dummyStations);
+      if (response.status === "success") {
+        setStations(response.data);
+      } else {
+        notification.error({
+          message: "Error",
+          description: response.message || "Failed to fetch stations data",
+        });
+      }
     } catch (error) {
       notification.error({
         message: "Error",
@@ -52,7 +51,7 @@ const StationActivation = () => {
 
   // Handle station selection
   const handleStationChange = (value) => {
-    const selected = stations.find(station => station.id === value);
+    const selected = stations.find(station => station.stationId === value);
     setSelectedStation(selected);
   };
 
@@ -68,11 +67,11 @@ const StationActivation = () => {
 
     try {
       // Save station ID to localStorage
-      localStorage.setItem('sid', selectedStation.id);
+      localStorage.setItem('sid', selectedStation.stationId);
       
       notification.success({
         message: "Station Activated",
-        description: `Station "${selectedStation.name}" has been activated successfully!`,
+        description: `Station "${selectedStation.stationName}" has been activated successfully!`,
       });
 
       // Navigate to the station view page after a short delay
@@ -117,8 +116,8 @@ const StationActivation = () => {
                   style={{ width: '100%' }}
                   onChange={handleStationChange}
                   options={stations.map(station => ({
-                    value: station.id,
-                    label: `${station.name} (${station.location})`,
+                    value: station.stationId,
+                    label: `${station.stationName} (${station.stationStatus})`,
                   }))}
                 />
               </div>
@@ -126,9 +125,11 @@ const StationActivation = () => {
               {selectedStation && (
                 <div className="p-3 bg-blue-50 rounded-md mb-3">
                   <p className="font-medium text-blue-700">Selected Station:</p>
-                  <p className="text-sm">ID: {selectedStation.id}</p>
-                  <p className="text-sm">Name: {selectedStation.name}</p>
-                  <p className="text-sm">Location: {selectedStation.location}</p>
+                  <p className="text-sm">ID: {selectedStation.stationId}</p>
+                  <p className="text-sm">Name: {selectedStation.stationName}</p>
+                  <p className="text-sm">Status: {selectedStation.stationStatus}</p>
+                  <p className="text-sm">Coordinates: {selectedStation.stationLocation.latitude}, {selectedStation.stationLocation.longitude}</p>
+                  <p className="text-sm">Radius: {selectedStation.radiusThreshold}m</p>
                 </div>
               )}
             </div>
