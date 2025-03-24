@@ -3,6 +3,13 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner, FaDoorOpen } from 'react-icons/fa';
 import Swal from 'sweetalert2';
+import dynamic from 'next/dynamic';
+import AttendanceService from '../api/attendance_service';
+
+// Import QrCodeScanner with no SSR to avoid hydration issues
+const QrCodeScanner = dynamic(() => import('../../components/QrCodeScanner'), { 
+  ssr: false 
+});
 
 export default function CheckoutPage() {
   const videoRef = useRef(null);
@@ -10,6 +17,8 @@ export default function CheckoutPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [scanMessage, setScanMessage] = useState('Posisikan QR Code dalam bingkai');
+  const [userLocation, setUserLocation] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // Show success alert
   const showSuccessAlert = (result) => {
@@ -32,59 +41,131 @@ export default function CheckoutPage() {
       confirmButtonText: 'Coba Lagi'
     });
   };
+
+  // Get user's current location
+  const getUserLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ latitude, longitude });
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          showErrorAlert('Tidak dapat mengakses lokasi. Pastikan GPS aktif dan berikan izin.');
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      showErrorAlert('Geolocation tidak didukung di perangkat ini.');
+    }
+  };
   
-  // Start camera when component mounts
+  // Handle successful QR scan
+  const handleScanSuccess = async (decodedText) => {
+    try {
+      setIsProcessing(true);
+      setScanMessage('Memproses data absensi...');
+      
+      // Parse the QR code data
+      let qrData;
+      try {
+        qrData = JSON.parse(decodedText);
+      } catch (err) {
+        throw new Error('Format QR Code tidak valid');
+      }
+      
+      // Validate QR data structure
+      if (!qrData.stationId || !qrData.expiredAt || !qrData.signature) {
+        throw new Error('QR Code tidak lengkap');
+      }
+      
+      // Check if QR code is expired
+      const expiredAt = new Date(qrData.expiredAt);
+      if (expiredAt < new Date()) {
+        throw new Error('QR Code sudah kedaluwarsa');
+      }
+      
+      // Get user ID from localStorage (you may want to use a more secure approach)
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        throw new Error('User tidak terautentikasi');
+      }
+      
+      // Get current location if not already available
+      if (!userLocation) {
+        throw new Error('Lokasi tidak tersedia. Aktifkan GPS dan berikan izin.');
+      }
+      
+      // Prepare data for API call
+      const attendanceData = {
+        userId,
+        scannedAt: new Date().toISOString(),
+        location: {
+          longitude: userLocation.longitude,
+          latitude: userLocation.latitude
+        },
+        qrData
+      };
+      
+      // Send checkout data to API
+      const response = await AttendanceService.recordCheckOutTime(attendanceData);
+      
+      if (response.success) {
+        const result = {
+          success: true,
+          location: response.data.location || "Tidak tersedia",
+          terminal: qrData.stationId || "Unknown",
+          timestamp: response.data.checkOutTime || new Date().toISOString(),
+          duration: response.data.duration || "N/A"
+        };
+        
+        setScanResult(result);
+        setIsScanning(false);
+        showSuccessAlert(result);
+      } else {
+        throw new Error(response.message || 'Gagal melakukan absen pulang');
+      }
+    } catch (error) {
+      console.error('Error processing scan:', error);
+      showErrorAlert(error.message);
+      setIsScanning(false);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  // Handle QR scan failure
+  const handleScanFailure = (error) => {
+    console.error('QR Scan error:', error);
+    setScanMessage('Tidak dapat memindai QR Code. Silakan coba lagi.');
+  };
+  
+  // Start camera and scanning process
   const startCamera = async () => {
     try {
       setIsScanning(true);
       setScanMessage('Meminta akses kamera...');
       
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }, // Use back camera if available
-        audio: false
-      });
+      // Get user location first
+      getUserLocation();
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setHasPermission(true);
-        setScanMessage('Posisikan QR Code dalam bingkai');
-        
-        // Simulate successful scan after 5 seconds (replace with real QR scanning)
-        setTimeout(() => {
-          const mockResult = {
-            success: true,
-            location: "Kantor Pusat Lt. 3",
-            terminal: "Terminal-AB12",
-            timestamp: new Date().toISOString(),
-            duration: "08h 30m" // Duration of work day
-          };
-          
-          setScanResult(mockResult);
-          stopCamera();
-          
-          // Show success alert
-          showSuccessAlert(mockResult);
-        }, 5000);
-      }
+      // Camera access is now handled by the QrCodeScanner component
+      setHasPermission(true);
+      setScanMessage('Posisikan QR Code dalam bingkai');
     } catch (err) {
-      console.error('Error accessing camera:', err);
+      console.error('Error preparing scan:', err);
       setHasPermission(false);
       setScanMessage('Tidak dapat mengakses kamera. Berikan izin kamera untuk melanjutkan.');
       setIsScanning(false);
       
-      // Show error alert
       showErrorAlert('Tidak dapat mengakses kamera. Pastikan Anda memberikan izin kamera.');
     }
   };
   
   // Stop camera
   const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = videoRef.current.srcObject.getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-      setIsScanning(false);
-    }
+    setIsScanning(false);
   };
   
   // Clean up when component unmounts
@@ -140,12 +221,12 @@ export default function CheckoutPage() {
           
           {isScanning && (
             <>
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline
-                className="absolute inset-0 min-w-full min-h-full object-cover"
-              />
+              <div className="absolute inset-0 w-full h-full">
+                <QrCodeScanner 
+                  onScanSuccess={handleScanSuccess} 
+                  onScanFailure={handleScanFailure}
+                />
+              </div>
               
               {/* Scanning overlay */}
               <div className="absolute inset-0 flex flex-col items-center justify-center">
