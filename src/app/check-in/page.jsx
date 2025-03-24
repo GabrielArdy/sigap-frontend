@@ -186,27 +186,36 @@ export default function ScanPage() {
       setIsScanning(true);
       setScanMessage('Meminta akses kamera...');
       
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }, // Use back camera if available
+      // Request camera with higher resolution for better QR scanning
+      const constraints = {
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          aspectRatio: { ideal: 1.7777777778 }
+        },
         audio: false
-      });
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute('playsinline', true); // Important for iOS Safari
         setHasPermission(true);
         setScanMessage('Posisikan QR Code dalam bingkai');
         
-        // Start QR code scanning
+        // Initialize canvas with proper size if it doesn't exist
+        if (!canvasRef.current) {
+          canvasRef.current = document.createElement('canvas');
+        }
+        
+        // Start scanning when video is ready
         videoRef.current.addEventListener('loadedmetadata', () => {
-          // Create canvas for QR code detection if it doesn't exist
-          if (!canvasRef.current) {
-            canvasRef.current = document.createElement('canvas');
-          }
-          
-          // Start scanning for QR codes
+          // Start scanning for QR codes at a higher frequency
           scanIntervalRef.current = setInterval(() => {
             scanQRCode();
-          }, 200); // Scan every 200ms
+          }, 100); // Scan every 100ms for faster detection
         });
       }
     } catch (err) {
@@ -227,37 +236,62 @@ export default function ScanPage() {
   
   // Scan QR code from video feed
   const scanQRCode = () => {
-    if (!videoRef.current || !canvasRef.current || !isScanning) return;
+    if (!videoRef.current || !canvasRef.current || !isScanning || !videoRef.current.videoWidth) return;
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
     
-    // Set canvas dimensions to video dimensions
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Get video dimensions
+    const videoWidth = video.videoWidth;
+    const videoHeight = video.videoHeight;
     
-    // Draw video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Define a scan region in the center of the video (where the QR frame is displayed)
+    // This makes scanning faster by focusing on a smaller region
+    const scanRegionSize = Math.min(videoWidth, videoHeight) * 0.5; // 50% of the smaller dimension
+    const scanRegionX = (videoWidth - scanRegionSize) / 2;
+    const scanRegionY = (videoHeight - scanRegionSize) / 2;
     
-    // Get image data from canvas
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    // Set canvas dimensions to the scan region
+    canvas.width = scanRegionSize;
+    canvas.height = scanRegionSize;
     
-    // Scan for QR code
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: "dontInvert",
-    });
-    
-    // If QR code is found
-    if (code) {
-      // Clear the scanning interval
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
-        scanIntervalRef.current = null;
-      }
+    try {
+      // Draw only the scan region to the canvas
+      context.drawImage(
+        video, 
+        scanRegionX, scanRegionY, scanRegionSize, scanRegionSize, // Source rectangle
+        0, 0, scanRegionSize, scanRegionSize // Destination rectangle
+      );
       
-      // Process the QR code data
-      processAttendance(code.data);
+      // Get image data from the canvas
+      const imageData = context.getImageData(0, 0, scanRegionSize, scanRegionSize);
+      
+      // Scan for QR code with inversionAttempts set to "attemptBoth" for better recognition
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "attemptBoth",
+      });
+      
+      // If QR code is found
+      if (code) {
+        // Provide visual feedback that QR was detected
+        setScanMessage('QR Code terdeteksi!');
+        
+        // Clear the scanning interval
+        if (scanIntervalRef.current) {
+          clearInterval(scanIntervalRef.current);
+          scanIntervalRef.current = null;
+        }
+        
+        // Add a small delay to show the "QR detected" message before processing
+        setTimeout(() => {
+          // Process the QR code data
+          processAttendance(code.data);
+        }, 300);
+      }
+    } catch (error) {
+      console.error('Error scanning QR code:', error);
+      // Continue scanning despite errors
     }
   };
   
@@ -361,26 +395,34 @@ export default function ScanPage() {
                 ref={videoRef} 
                 autoPlay 
                 playsInline
+                muted
                 className="absolute inset-0 min-w-full min-h-full object-cover"
               />
               
               {/* Scanning overlay */}
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                {/* QR Frame */}
-                <div className="w-64 h-64 relative">
-                  {/* Corner markers */}
-                  <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-white"></div>
-                  <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-white"></div>
-                  <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-white"></div>
-                  <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-white"></div>
+                {/* QR Frame - make it more visible */}
+                <div className="w-64 h-64 relative border border-white border-opacity-20">
+                  {/* Corner markers - made more prominent */}
+                  <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-white"></div>
+                  <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-white"></div>
+                  <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-white"></div>
+                  <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-white"></div>
                   
-                  {/* Scanning animation */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-[#3549b1] animate-scan"></div>
+                  {/* Scanning animation - make it more visible */}
+                  <div className="absolute top-0 left-0 right-0 h-2 bg-[#3549b1] animate-scan"></div>
+                  
+                  {/* Add helper text in the middle of the frame */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-white text-xs bg-black bg-opacity-40 px-2 py-1 rounded-md">
+                      Arahkan ke QR Code
+                    </div>
+                  </div>
                 </div>
                 
-                {/* Status message */}
+                {/* Status message - made more prominent */}
                 <div className="absolute bottom-16 left-0 right-0 flex justify-center">
-                  <span className="bg-black bg-opacity-70 text-white px-4 py-2 rounded-full text-sm flex items-center">
+                  <span className="bg-black bg-opacity-70 text-white px-5 py-3 rounded-full text-sm flex items-center font-medium shadow-lg">
                     <FaSpinner className="animate-spin mr-2" /> {scanMessage}
                   </span>
                 </div>
@@ -404,11 +446,11 @@ export default function ScanPage() {
       <style jsx global>{`
         @keyframes scan {
           0% { top: 0; }
-          50% { top: calc(100% - 2px); }
+          50% { top: calc(100% - 4px); }
           100% { top: 0; }
         }
         .animate-scan {
-          animation: scan 2s linear infinite;
+          animation: scan 1.5s linear infinite;
         }
       `}</style>
     </div>
