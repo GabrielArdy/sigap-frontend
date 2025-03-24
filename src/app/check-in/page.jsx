@@ -3,12 +3,10 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner, FaMapMarkerAlt } from 'react-icons/fa';
 import Swal from 'sweetalert2';
-import jsQR from 'jsqr';
+import { QrScanner } from '@yudiel/react-qr-scanner';
 import AttendanceService from '../api/attendance_service';
 
 export default function ScanPage() {
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
   const [hasPermission, setHasPermission] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
@@ -16,7 +14,6 @@ export default function ScanPage() {
   const [userId, setUserId] = useState(null);
   const [locationData, setLocationData] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
-  const scanIntervalRef = useRef(null);
   
   // Get user ID from local storage on component mount
   useEffect(() => {
@@ -78,7 +75,7 @@ export default function ScanPage() {
   // Process QR code data and send to API
   const processAttendance = async (qrData) => {
     try {
-      stopCamera();
+      setIsScanning(false);
       setScanMessage('Memproses absensi...');
       
       // Parse QR code data
@@ -166,7 +163,8 @@ export default function ScanPage() {
       await getCurrentLocation();
       
       // Then start camera
-      await startCamera();
+      setIsScanning(true);
+      setHasPermission(true);
     } catch (error) {
       console.error('Error preparing scan:', error);
       Swal.fire({
@@ -180,146 +178,32 @@ export default function ScanPage() {
     }
   };
   
-  // Start camera and QR scanning
-  const startCamera = async () => {
-    try {
-      setIsScanning(true);
-      setScanMessage('Meminta akses kamera...');
-      
-      // Request camera with higher resolution for better QR scanning
-      const constraints = {
-        video: { 
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          aspectRatio: { ideal: 1.7777777778 }
-        },
-        audio: false
-      };
-      
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute('playsinline', true); // Important for iOS Safari
-        setHasPermission(true);
-        setScanMessage('Posisikan QR Code dalam bingkai');
-        
-        // Initialize canvas with proper size if it doesn't exist
-        if (!canvasRef.current) {
-          canvasRef.current = document.createElement('canvas');
-        }
-        
-        // Start scanning when video is ready
-        videoRef.current.addEventListener('loadedmetadata', () => {
-          // Start scanning for QR codes at a higher frequency
-          scanIntervalRef.current = setInterval(() => {
-            scanQRCode();
-          }, 100); // Scan every 100ms for faster detection
-        });
-      }
-    } catch (err) {
-      console.error('Error accessing camera:', err);
+  // Handle successful QR detection from the library
+  const handleDecode = (result) => {
+    if (result && isScanning) {
+      setScanMessage('QR Code terdeteksi!');
+      // Process the result after a small delay to show the detection message
+      setTimeout(() => {
+        processAttendance(result);
+      }, 300);
+    }
+  };
+  
+  // Handle QR scanning errors from the library
+  const handleScanError = (error) => {
+    console.error('QR scan error:', error);
+    // We don't want to show an error for every frame that doesn't contain a QR code
+    // So we only handle critical errors that would stop scanning
+    if (error.name !== 'NotFoundError') {
       setHasPermission(false);
-      setScanMessage('Tidak dapat mengakses kamera. Berikan izin kamera untuk melanjutkan.');
       setIsScanning(false);
-      
-      // Show error message with SweetAlert
-      Swal.fire({
-        icon: 'error',
-        title: 'Akses Kamera Gagal',
-        text: 'Tidak dapat mengakses kamera. Pastikan Anda memberikan izin kamera untuk aplikasi ini.',
-        confirmButtonColor: '#3549b1',
-      });
+      handleScanFailed('Terjadi kesalahan saat memindai. Silakan coba lagi.');
     }
   };
   
-  // Scan QR code from video feed
-  const scanQRCode = () => {
-    if (!videoRef.current || !canvasRef.current || !isScanning || !videoRef.current.videoWidth) return;
-    
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    
-    // Get video dimensions
-    const videoWidth = video.videoWidth;
-    const videoHeight = video.videoHeight;
-    
-    // Define a scan region in the center of the video (where the QR frame is displayed)
-    // This makes scanning faster by focusing on a smaller region
-    const scanRegionSize = Math.min(videoWidth, videoHeight) * 0.5; // 50% of the smaller dimension
-    const scanRegionX = (videoWidth - scanRegionSize) / 2;
-    const scanRegionY = (videoHeight - scanRegionSize) / 2;
-    
-    // Set canvas dimensions to the scan region
-    canvas.width = scanRegionSize;
-    canvas.height = scanRegionSize;
-    
-    try {
-      // Draw only the scan region to the canvas
-      context.drawImage(
-        video, 
-        scanRegionX, scanRegionY, scanRegionSize, scanRegionSize, // Source rectangle
-        0, 0, scanRegionSize, scanRegionSize // Destination rectangle
-      );
-      
-      // Get image data from the canvas
-      const imageData = context.getImageData(0, 0, scanRegionSize, scanRegionSize);
-      
-      // Scan for QR code with inversionAttempts set to "attemptBoth" for better recognition
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "attemptBoth",
-      });
-      
-      // If QR code is found
-      if (code) {
-        // Provide visual feedback that QR was detected
-        setScanMessage('QR Code terdeteksi!');
-        
-        // Clear the scanning interval
-        if (scanIntervalRef.current) {
-          clearInterval(scanIntervalRef.current);
-          scanIntervalRef.current = null;
-        }
-        
-        // Add a small delay to show the "QR detected" message before processing
-        setTimeout(() => {
-          // Process the QR code data
-          processAttendance(code.data);
-        }, 300);
-      }
-    } catch (error) {
-      console.error('Error scanning QR code:', error);
-      // Continue scanning despite errors
-    }
-  };
-  
-  // Stop camera
-  const stopCamera = () => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
-    }
-    
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = videoRef.current.srcObject.getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-      setIsScanning(false);
-    }
-  };
-  
-  // Clean up when component unmounts
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, []);
-
   // Handle scan failure
   const handleScanFailed = (message) => {
-    stopCamera();
+    setIsScanning(false);
     Swal.fire({
       icon: 'error',
       title: 'Scan Gagal',
@@ -328,9 +212,14 @@ export default function ScanPage() {
       confirmButtonText: 'Coba Lagi',
     }).then((result) => {
       if (result.isConfirmed) {
-        startCamera();
+        setIsScanning(true);
       }
     });
+  };
+  
+  // Stop scanning
+  const stopScanning = () => {
+    setIsScanning(false);
   };
 
   return (
@@ -391,28 +280,42 @@ export default function ScanPage() {
           
           {isScanning && (
             <>
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline
-                muted
-                className="absolute inset-0 min-w-full min-h-full object-cover"
-              />
+              <div className="absolute inset-0 z-10">
+                <QrScanner
+                  onDecode={handleDecode}
+                  onError={handleScanError}
+                  constraints={{
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                  }}
+                  containerStyle={{
+                    width: '100%',
+                    height: '100%',
+                  }}
+                  scanDelay={300}
+                  videoStyle={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover'
+                  }}
+                />
+              </div>
               
               {/* Scanning overlay */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                {/* QR Frame - make it more visible */}
-                <div className="w-64 h-64 relative border border-white border-opacity-20">
-                  {/* Corner markers - made more prominent */}
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
+                {/* QR Frame */}
+                <div className="w-64 h-64 relative border border-white border-opacity-30">
+                  {/* Corner markers */}
                   <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-white"></div>
                   <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-white"></div>
                   <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-white"></div>
                   <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-white"></div>
                   
-                  {/* Scanning animation - make it more visible */}
+                  {/* Scanning animation */}
                   <div className="absolute top-0 left-0 right-0 h-2 bg-[#3549b1] animate-scan"></div>
                   
-                  {/* Add helper text in the middle of the frame */}
+                  {/* Helper text */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-white text-xs bg-black bg-opacity-40 px-2 py-1 rounded-md">
                       Arahkan ke QR Code
@@ -420,7 +323,7 @@ export default function ScanPage() {
                   </div>
                 </div>
                 
-                {/* Status message - made more prominent */}
+                {/* Status message */}
                 <div className="absolute bottom-16 left-0 right-0 flex justify-center">
                   <span className="bg-black bg-opacity-70 text-white px-5 py-3 rounded-full text-sm flex items-center font-medium shadow-lg">
                     <FaSpinner className="animate-spin mr-2" /> {scanMessage}
@@ -434,8 +337,8 @@ export default function ScanPage() {
         {/* Cancel button - only show when scanning */}
         {isScanning && (
           <button 
-            onClick={stopCamera} 
-            className="mt-6 py-4 px-6 bg-white border border-gray-300 text-gray-700 rounded-full font-medium shadow-md flex items-center justify-center mx-auto hover:bg-gray-100 transition-colors"
+            onClick={stopScanning} 
+            className="mt-6 py-4 px-6 bg-white border border-gray-300 text-gray-700 rounded-full font-medium shadow-md flex items-center justify-center mx-auto hover:bg-gray-100 transition-colors z-30"
           >
             Batal
           </button>
