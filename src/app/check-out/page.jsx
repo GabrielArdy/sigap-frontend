@@ -19,6 +19,7 @@ export default function CheckoutPage() {
   const [scanMessage, setScanMessage] = useState('Posisikan QR Code dalam bingkai');
   const [userLocation, setUserLocation] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   
   // Show success alert - simplified similar to check-in page
   const showSuccessAlert = (result) => {
@@ -72,20 +73,34 @@ export default function CheckoutPage() {
 
   // Get user's current location
   const getUserLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setUserLocation({ latitude, longitude });
-        },
-        (error) => {
-          showErrorAlert('Tidak dapat mengakses lokasi. Pastikan GPS aktif dan berikan izin.');
-        },
-        { enableHighAccuracy: true }
-      );
-    } else {
-      showErrorAlert('Geolocation tidak didukung di perangkat ini.');
-    }
+    return new Promise((resolve, reject) => {
+      setIsLoadingLocation(true);
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const locationData = { latitude, longitude };
+            setUserLocation(locationData);
+            setIsLoadingLocation(false);
+            resolve(locationData);
+          },
+          (error) => {
+            setIsLoadingLocation(false);
+            showErrorAlert('Tidak dapat mengakses lokasi. Pastikan GPS aktif dan berikan izin.');
+            reject(error);
+          },
+          { 
+            enableHighAccuracy: true, 
+            timeout: 10000, 
+            maximumAge: 0 
+          }
+        );
+      } else {
+        setIsLoadingLocation(false);
+        showErrorAlert('Geolocation tidak didukung di perangkat ini.');
+        reject(new Error('Geolocation is not supported by this browser'));
+      }
+    });
   };
   
   // Handle successful QR scan
@@ -175,25 +190,22 @@ export default function CheckoutPage() {
     setScanMessage('Tidak dapat memindai QR Code. Silakan coba lagi.');
   };
   
-  // Start camera and scanning process
-  const startCamera = async () => {
+  // Prepare and start scanning - getting location first
+  const prepareScanning = async () => {
     try {
-      setIsScanning(true);
-      setScanMessage('Meminta akses kamera...');
-      
-      // Get user location first
-      getUserLocation();
-      
-      // Camera access is now handled by the QrCodeScanner component
-      setHasPermission(true);
-      setScanMessage('Posisikan QR Code dalam bingkai');
-    } catch (err) {
-      setHasPermission(false);
-      setScanMessage('Tidak dapat mengakses kamera. Berikan izin kamera untuk melanjutkan.');
-      setIsScanning(false);
-      
-      showErrorAlert('Tidak dapat mengakses kamera. Pastikan Anda memberikan izin kamera.');
+      setScanMessage('Mendapatkan lokasi...');
+      await getUserLocation();
+      startCamera();
+    } catch (error) {
+      showErrorAlert('Tidak dapat mengakses lokasi. Pastikan GPS aktif dan berikan izin.');
     }
+  };
+  
+  // Start camera after location is obtained
+  const startCamera = () => {
+    setIsScanning(true);
+    setHasPermission(true);
+    setScanMessage('Posisikan QR Code dalam bingkai');
   };
   
   // Stop camera
@@ -249,10 +261,17 @@ export default function CheckoutPage() {
                 Aktifkan kamera untuk memulai scan QR Code absen pulang
               </p>
               <button
-                onClick={startCamera}
-                className="px-6 py-3 bg-[#3549b1] text-white rounded-lg font-medium shadow-lg hover:bg-[#2e3a7a] transition-colors"
+                onClick={prepareScanning}
+                disabled={isLoadingLocation}
+                className="px-6 py-3 bg-[#3549b1] text-white rounded-lg font-medium shadow-lg hover:bg-[#2e3a7a] transition-colors disabled:bg-gray-400"
               >
-                Mulai Scan
+                {isLoadingLocation ? (
+                  <>
+                    <FaSpinner className="animate-spin inline mr-2" /> Mendapatkan Lokasi...
+                  </>
+                ) : (
+                  'Mulai Scan'
+                )}
               </button>
             </div>
           )}
