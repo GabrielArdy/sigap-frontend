@@ -16,6 +16,7 @@ export default function StationLayout({ children }) {
     return () => clearInterval(timer);
   }, []);
 
+
   // Format time
   const formattedTime = currentTime.toLocaleTimeString("id-ID", {
     hour: "2-digit",

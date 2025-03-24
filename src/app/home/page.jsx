@@ -74,6 +74,15 @@ export default function HomePage() {
     router.push('/check-out');
   };
 
+  const handleLogout = () => {
+    localStorage.clear();
+    router.push('/login');
+  };
+
+  const handleMonthlyReport = () => {
+    router.push('/report');
+  }
+
   // Prepare display data based on API response
   const displayData = userData ? {
     name: `${userData.user.firstName} ${userData.user.lastName}`,
@@ -107,7 +116,8 @@ export default function HomePage() {
             <FaBell className="text-xl" />
             <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></span>
           </button>
-          <button className="p-2 hover:bg-[#3549b1]/70 rounded-full transition-colors duration-200">
+          <button onClick={handleLogout}
+            className="p-2 hover:bg-[#3549b1]/70 rounded-full transition-colors duration-200">
             <FaSignOutAlt className="text-xl" />
           </button>
         </div>
@@ -220,7 +230,8 @@ export default function HomePage() {
         </div>
 
         {/* Monthly Report Button */}
-        <button className="mt-2 bg-gradient-to-r from-[#2a3b8f] to-[#3549b1] hover:from-[#243780] hover:to-[#2d3e9d] text-white py-4 px-6 rounded-xl shadow-md transition-all flex items-center justify-center transform hover:translate-y-[-2px] hover:shadow-lg duration-200">
+        <button onClick={handleMonthlyReport}
+          className="mt-2 bg-gradient-to-r from-[#2a3b8f] to-[#3549b1] hover:from-[#243780] hover:to-[#2d3e9d] text-white py-4 px-6 rounded-xl shadow-md transition-all flex items-center justify-center transform hover:translate-y-[-2px] hover:shadow-lg duration-200">
           <div className="bg-white/20 p-2 rounded-lg mr-3">
             <FaClipboardList className="text-white" />
           </div>
