@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner, FaDoorOpen } from 'react-icons/fa';
+import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner, FaDoorOpen, FaMapMarkerAlt } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import dynamic from 'next/dynamic';
 import AttendanceService from '../api/attendance_service';
@@ -196,6 +196,11 @@ export default function CheckoutPage() {
           </h2>
           <p className="text-gray-600 text-sm">
             Arahkan kamera ke QR Code pada anjungan absensi untuk menyelesaikan sesi kerja hari ini.
+            {userLocation && (
+              <span className="flex items-center mt-2 text-green-600">
+                <FaMapMarkerAlt className="mr-1" /> Lokasi terdeteksi
+              </span>
+            )}
           </p>
         </div>
         
@@ -221,30 +226,31 @@ export default function CheckoutPage() {
           
           {isScanning && (
             <>
-              <div className="absolute inset-0 w-full h-full">
+              {/* QrCodeScanner component with fixed z-index */}
+              <div className="w-full h-full absolute inset-0 z-10">
                 <QrCodeScanner 
                   onScanSuccess={handleScanSuccess} 
                   onScanFailure={handleScanFailure}
                 />
               </div>
               
-              {/* Scanning overlay */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                {/* QR Frame - using a different color to differentiate */}
-                <div className="w-64 h-64 relative">
-                  {/* Corner markers */}
-                  <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-orange-400"></div>
-                  <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-orange-400"></div>
-                  <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-orange-400"></div>
-                  <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-orange-400"></div>
+              {/* Single scanning overlay with 1:1 aspect ratio */}
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
+                {/* QR Frame with 1:1 aspect ratio and consistent styling */}
+                <div className="w-64 h-64 relative border border-white border-opacity-30">
+                  {/* Corner markers with orange color for checkout */}
+                  <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-orange-400"></div>
+                  <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-orange-400"></div>
+                  <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-orange-400"></div>
+                  <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-orange-400"></div>
                   
                   {/* Scanning animation */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-orange-400 animate-scan"></div>
+                  <div className="absolute top-0 left-0 right-0 h-2 bg-orange-400 animate-scan"></div>
                 </div>
                 
                 {/* Status message */}
                 <div className="absolute bottom-16 left-0 right-0 flex justify-center">
-                  <span className="bg-black bg-opacity-70 text-white px-4 py-2 rounded-full text-sm flex items-center">
+                  <span className="bg-black bg-opacity-70 text-white px-5 py-3 rounded-full text-sm flex items-center font-medium shadow-lg">
                     <FaSpinner className="animate-spin mr-2" /> {scanMessage}
                   </span>
                 </div>
@@ -295,7 +301,7 @@ export default function CheckoutPage() {
               stopCamera();
               showErrorAlert('Proses scan dibatalkan');
             }} 
-            className="mt-6 py-4 px-6 bg-white border border-gray-300 text-gray-700 rounded-full font-medium shadow-md flex items-center justify-center mx-auto hover:bg-gray-100 transition-colors"
+            className="mt-6 py-4 px-6 bg-white border border-gray-300 text-gray-700 rounded-full font-medium shadow-md flex items-center justify-center mx-auto hover:bg-gray-100 transition-colors z-30"
           >
             Batal
           </button>
@@ -306,11 +312,35 @@ export default function CheckoutPage() {
       <style jsx global>{`
         @keyframes scan {
           0% { top: 0; }
-          50% { top: calc(100% - 2px); }
+          50% { top: calc(100% - 4px); }
           100% { top: 0; }
         }
         .animate-scan {
-          animation: scan 2s linear infinite;
+          animation: scan 1.5s linear infinite;
+        }
+        
+        /* Styling for QR scanner container */
+        #qr-reader {
+          border: none !important;
+          padding: 0 !important;
+          background: transparent !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+        #qr-reader video {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+          border: none !important;
+        }
+        #qr-reader__dashboard_section_csr button {
+          visibility: hidden;
+        }
+        #qr-reader__status_span {
+          display: none !important;
+        }
+        #qr-reader__dashboard_section_swaplink {
+          display: none !important;
         }
       `}</style>
     </div>
