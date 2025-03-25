@@ -57,11 +57,19 @@ export default function AttendancePage() {
         if (response.success) {
           // Process the attendance data from API
           const processedData = response.data.map((item) => {
+            // Check if checkOut is epoch date (1970-01-01) or invalid
+            const checkOutDate = item.checkOut ? new Date(item.checkOut) : null;
+            const isEpochDate = checkOutDate && 
+              (checkOutDate.getFullYear() === 1970 && 
+               checkOutDate.getMonth() === 0 && 
+               checkOutDate.getDate() === 1);
+            
             return {
               id: item.attendanceId,
               date: new Date(item.date),
               timeIn: item.checkIn ? new Date(item.checkIn).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
-              timeOut: item.checkOut ? new Date(item.checkOut).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
+              timeOut: item.checkOut && !isEpochDate ? 
+                new Date(item.checkOut).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
               status: statusMapping[item.attendanceStatus] || 'Unknown',
               staffName: item.fullName,
               // Create a unique staff ID from the name if needed for filtering
