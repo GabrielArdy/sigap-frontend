@@ -4,8 +4,6 @@ import { FiUsers, FiCalendar, FiClock, FiActivity, FiArrowUp, FiArrowDown, FiChe
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function DashboardPage() {
-  const [selectedTimeRange, setSelectedTimeRange] = useState('this-week');
-  
   // Mock data - in a real app, this would come from your API
   const stats = {
     'today': {
@@ -25,7 +23,7 @@ export default function DashboardPage() {
     },
   };
 
-  // Attendance chart data
+  // Attendance chart data - Sunday removed
   const attendanceData = [
     { name: 'Senin', hadir: 75, tidakHadir: 10 },
     { name: 'Selasa', hadir: 76, tidakHadir: 9 },
@@ -33,7 +31,6 @@ export default function DashboardPage() {
     { name: 'Kamis', hadir: 78, tidakHadir: 7 },
     { name: 'Jumat', hadir: 79, tidakHadir: 6 },
     { name: 'Sabtu', hadir: 65, tidakHadir: 20 },
-    { name: 'Minggu', hadir: 60, tidakHadir: 25 },
   ];
 
   // Recent activity data
@@ -75,7 +72,8 @@ export default function DashboardPage() {
     },
   ];
 
-  const currentStats = stats[selectedTimeRange];
+  // Use daily stats by default
+  const currentStats = stats['today'];
 
   return (
     <div className="space-y-6">
@@ -89,15 +87,14 @@ export default function DashboardPage() {
         </div>
         
         <div className="mt-4 md:mt-0">
-          <select
-            value={selectedTimeRange}
-            onChange={(e) => setSelectedTimeRange(e.target.value)}
-            className="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500"
+          <a 
+            href="/station/activated" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-900 focus:outline-none focus:border-blue-900 focus:ring ring-blue-300 disabled:opacity-25 transition ease-in-out duration-150"
           >
-            <option value="today">Hari Ini</option>
-            <option value="this-week">Minggu Ini</option>
-            <option value="this-month">Bulan Ini</option>
-          </select>
+            Aktifkan Anjungan
+          </a>
         </div>
       </div>
 
