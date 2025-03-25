@@ -24,10 +24,10 @@ export default function AdminLoginPage() {
       
       if (response.success) {
         // Store authentication token
-        localStorage.setItem('admin_token', response.token);
+        localStorage.setItem('token', response.token);
         // Store user data if needed
         if (response.user) {
-          localStorage.setItem('admin_user', JSON.stringify(response.user));
+          localStorage.setItem('user', JSON.stringify(response.user));
         }
         // Redirect to dashboard
         router.push('/admin/dashboard');
@@ -143,7 +143,7 @@ export default function AdminLoginPage() {
                   type="checkbox"
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIwMTgxODcxZS1jMzRjLTRiN2ItODQ2Ny05NmI3MTA4YjE0MjkiLCJlbWFpbCI6ImRhbmRpSGFyMTBAZW1haWwuY29tIiwiaWF0IjoxNzQyODc1OTc1LCJleHAiOjE3NDI5NjIzNzV9.MkSD9wlTQuG5t1T1yTGvdLbSPTNS-lpyG0RugHcjmGUgray-700">
                   Ingat saya
                 </label>
               </div>
