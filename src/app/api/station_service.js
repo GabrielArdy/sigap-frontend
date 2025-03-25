@@ -20,6 +20,25 @@ const StationService = {
             return error.response.data;
         }
     },
+
+    updateStatusStation: async (stationId, status) => {
+        try {
+            const response = await api.put(`/stations/`, { stationId, status });
+            return response.data;
+        } catch (error) {
+            return error.response.data;
+        }
+    },
+
+    getStationStatus: async (stationId) => {
+        try {
+            const response = await api.get(`/stations/status/${stationId}`);
+            return response.data;
+        } catch (error) {
+            return error.response.data;
+        }
+    },
+
     deleteStation: async (stationId) => {
         try {
             console.log('Station ID being sent to API:', stationId); // Debug the stationId

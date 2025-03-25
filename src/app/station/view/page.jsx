@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Spin, notification, Button, Image } from "antd";
 import { useRouter } from "next/navigation";
 import StationService from "../../api/station_service";
+import Image from "next/image";
 
 const QRCodePage = () => {
   const [qrCodeData, setQrCodeData] = useState(null);
@@ -14,7 +14,27 @@ const QRCodePage = () => {
   const [stationInfo, setStationInfo] = useState(null);
   const [errorState, setErrorState] = useState(false);
   const [retryTimer, setRetryTimer] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const notificationIdRef = useRef(0);
   const router = useRouter();
+
+  // Custom notification function to replace antd notifications
+  const showNotification = (type, title, message) => {
+    const id = notificationIdRef.current++;
+    const newNotification = {
+      id,
+      type,
+      title,
+      message,
+    };
+    
+    setNotifications(prev => [...prev, newNotification]);
+    
+    // Auto remove after 4.5 seconds
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 4500);
+  };
 
   // Function to fetch station information
   const fetchStationInfo = async (stationId) => {
@@ -33,10 +53,7 @@ const QRCodePage = () => {
         throw new Error(response.message || "Failed to fetch station information");
       }
     } catch (error) {
-      notification.error({
-        message: "Error",
-        description: error.message || "Failed to fetch station information"
-      });
+      showNotification("error", "Error", error.message || "Failed to fetch station information");
       return null;
     }
   };
@@ -82,10 +99,7 @@ const QRCodePage = () => {
       }
     } catch (error) {
       setErrorState(true);
-      notification.error({
-        message: "Error",
-        description: error.message || "Failed to connect to server"
-      });
+      showNotification("error", "Error", error.message || "Failed to connect to server");
       
       // Setup retry timer
       setupRetryTimer();
@@ -109,10 +123,7 @@ const QRCodePage = () => {
     const stationId = localStorage.getItem('sid');
     
     if (!stationId) {
-      notification.warning({
-        message: "No Station Activated",
-        description: "Please activate a station first"
-      });
+      showNotification("warning", "No Station Activated", "Please activate a station first");
       router.push('/station/activated');
       return;
     }
@@ -158,16 +169,17 @@ const QRCodePage = () => {
     const handleResize = () => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.clientWidth;
-        const containerHeight = window.innerHeight * 0.5; // Use 50% of viewport height as a guide
+        // Calculate available height for QR code based on viewport
+        const viewportHeight = window.innerHeight;
+        // Reduce the height allocation to fit everything without scrolling
+        const availableHeight = viewportHeight * 0.55; // Reduced from 0.65
         
-        // Calculate size using both width and height constraints
-        // Use 90% of container width for better visibility
-        const widthConstraint = containerWidth * 0.9;
-        // Ensure there's enough space for the timer (leaving ~120px)
-        const heightConstraint = containerHeight - 120;
+        const widthConstraint = containerWidth * 0.85; // Reduced from 0.9
+        // Adjust height constraint to avoid overflow
+        const heightConstraint = availableHeight - 100; // Increased padding from 80 to 100
         
-        // Use the smaller dimension to ensure QR fits
-        const newSize = Math.min(350, widthConstraint, heightConstraint);
+        // Make QR code smaller - reduced max size from 550 to 450
+        const newSize = Math.min(450, widthConstraint, heightConstraint);
         setQrSize(newSize);
       }
     };
@@ -181,8 +193,27 @@ const QRCodePage = () => {
   }, []);
 
   // Function to handle changing the station
-  const handleChangeStation = () => {
-    router.push('/station/activated');
+  const handleChangeStation = async () => {
+    try {
+      if (stationInfo) {
+        setLoading(true);
+        // Call backend to update station status to offline
+        const response = await StationService.updateStatusStation(stationInfo.stationId, "offline");
+        
+        if (response.status === "success") {
+          showNotification("success", "Station Status Updated", "Station has been set to offline");
+        } else {
+          throw new Error(response.message || "Failed to update station status");
+        }
+      }
+    } catch (error) {
+      showNotification("error", "Error", error.message || "Failed to update station status");
+    } finally {
+      setLoading(false);
+      // Navigate to station activation page regardless of success/failure
+      // to allow user to activate a different station
+      router.push('/station/activated');
+    }
   };
 
   // Function to manually retry fetching QR code
@@ -196,70 +227,98 @@ const QRCodePage = () => {
         <div className="text-center p-6 bg-white rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-red-600">No Station Activated</h2>
           <p className="text-gray-600 mb-4">Please activate a station first.</p>
-          <Button type="primary" onClick={() => router.push('/station/activated')}>
+          <button 
+            onClick={() => router.push('/station/activated')}
+            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors"
+          >
             Activate Station
-          </Button>
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full justify-between items-center py-1">
+    <div className="flex flex-col h-screen justify-between items-center py-1 overflow-hidden">
+      {/* Custom Notifications */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+        {notifications.map(notification => (
+          <div 
+            key={notification.id} 
+            className={`p-3 rounded-lg shadow-md max-w-xs animate-fade-in ${
+              notification.type === 'error' ? 'bg-red-50 border-l-4 border-red-500' : 
+              notification.type === 'success' ? 'bg-green-50 border-l-4 border-green-500' : 
+              notification.type === 'warning' ? 'bg-yellow-50 border-l-4 border-yellow-500' : 
+              'bg-blue-50 border-l-4 border-blue-500'
+            }`}
+          >
+            <h4 className={`font-medium ${
+              notification.type === 'error' ? 'text-red-800' : 
+              notification.type === 'success' ? 'text-green-800' : 
+              notification.type === 'warning' ? 'text-yellow-800' : 
+              'text-blue-800'
+            }`}>
+              {notification.title}
+            </h4>
+            <p className="text-sm text-black">{notification.message}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Station information display */}
       {stationInfo && (
-        <div className="text-center mb-1">
+        <div className="text-center mb-1 flex-shrink-0">
           <div className="flex items-center justify-center mb-1">
             <div className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
               Station ID: {stationInfo.stationId}
             </div>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-blue-600">{stationInfo.stationName}</h1>
-          <p className="text-gray-500 text-xs sm:text-sm">
+          <p className="text-xs sm:text-sm text-black font-medium">
             Status: {stationInfo.stationStatus}
           </p>
           <button 
             onClick={handleChangeStation}
-            className="text-xs text-blue-600 hover:underline mt-1"
+            className="text-xs text-blue-600 hover:underline mt-1 font-medium"
           >
             Change Station
           </button>
         </div>
       )}
 
-      <div className="w-full max-w-lg mx-auto bg-white rounded-xl shadow-lg overflow-hidden flex-1 flex flex-col justify-center" ref={containerRef}>
+      <div className="w-full max-w-3xl mx-auto bg-white rounded-xl shadow-lg flex flex-col justify-center items-center my-1 overflow-hidden" ref={containerRef}>
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-10">
-            <Spin size="large" />
-            <div className="mt-4 text-gray-600">Loading QR Code...</div>
+          <div className="flex flex-col items-center justify-center py-6">
+            {/* Custom spinner using Tailwind */}
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            <div className="mt-4 text-black font-medium">Loading QR Code...</div>
           </div>
         ) : errorState ? (
-          <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+          <div className="flex flex-col items-center justify-center py-6 px-4 text-center">
             <div className="text-red-500 text-5xl mb-4">❌</div>
             <h3 className="text-lg font-medium text-red-600 mb-2">Failed to load QR Code</h3>
-            <p className="text-gray-600 mb-6">The system will automatically try again in a few seconds.</p>
+            <p className="text-black mb-4">The system will automatically try again in a few seconds.</p>
             <div className="text-lg font-medium text-blue-600">
               Connecting to server...
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full py-4 px-2">
+          <div className="flex flex-col items-center justify-center w-full py-2 px-2">
             {/* QR Code display using the base64 image from API */}
-            <div className="mb-4 p-4 bg-white rounded-lg border-2 border-blue-100 flex items-center justify-center">
+            <div className="mb-2 p-2 bg-white rounded-lg border-2 border-blue-100 flex items-center justify-center">
               {qrCodeData && (
-                <Image
+                <img
                   src={qrCodeData.qrCode}
                   alt="QR Code"
                   width={qrSize}
                   height={qrSize}
-                  style={{ maxWidth: '100%', maxHeight: '100%' }}
-                  preview={false}
+                  className="max-w-full max-h-full"
                 />
               )}
             </div>
 
             {/* Timer Section - now separate from QR for better space management */}
-            <div className="w-full bg-blue-50 py-2 sm:py-3 px-3 border-t border-blue-100">
+            <div className="w-full bg-blue-50 py-2 px-3 border-t border-blue-100">
               <div className="flex flex-col items-center">
                 <p className="text-blue-700 mb-1 font-medium text-xs">TIME UNTIL REFRESH</p>
                 <div className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-600 py-1 px-4 bg-white rounded-lg shadow-sm border border-blue-200 tracking-wider">
@@ -271,7 +330,7 @@ const QRCodePage = () => {
         )}
       </div>
       
-      <p className="text-xs text-gray-500 mt-1">
+      <p className="text-xs text-black font-medium mt-1 flex-shrink-0">
         {errorState ? "Automatic reconnection in progress..." : "This QR code refreshes every 5 minutes"}
       </p>
     </div>

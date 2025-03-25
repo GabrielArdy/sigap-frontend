@@ -10,8 +10,24 @@ export default function AttendanceReportPage() {
   const [attendanceData, setAttendanceData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const userId = "0181871e-c34c-4b7b-8467-96b7108b1429"; // In a real app, get from context/auth
+  const [userId, setUserId] = useState(null);
   
+  // Load user data from local storage
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        setUserId(userData.userId);
+      } else {
+        setError("User data not found. Please login again.");
+      }
+    } catch (err) {
+      console.error("Error loading user data:", err);
+      setError("Failed to load user data");
+    }
+  }, []);
+
   // Generate last 6 months for selection
   const months = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
@@ -32,7 +48,7 @@ export default function AttendanceReportPage() {
   
   // Fetch attendance data when selected month changes
   useEffect(() => {
-    if (!selectedMonth) return;
+    if (!selectedMonth || !userId) return;
     
     const fetchAttendanceData = async () => {
       setIsLoading(true);
@@ -57,7 +73,7 @@ export default function AttendanceReportPage() {
     };
     
     fetchAttendanceData();
-  }, [selectedMonth]);
+  }, [selectedMonth, userId]);
   
   // Format attendance data from API to display format
   const formatAttendanceData = (data) => {
