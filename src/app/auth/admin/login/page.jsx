@@ -96,7 +96,7 @@ export default function AdminLoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 p-2.5"
-                  placeholder="admin@sigap.com"
+                  placeholder="Masukkan Email"
                 />
               </div>
             </div>
@@ -117,7 +117,7 @@ export default function AdminLoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 pr-10 p-2.5"
-                  placeholder="••••••••"
+                  placeholder="Masukkan Password"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                   <button
