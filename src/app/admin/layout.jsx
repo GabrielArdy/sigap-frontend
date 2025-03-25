@@ -10,7 +10,36 @@ export default function DashboardLayout({ children }) {
   const [isMobile, setIsMobile] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isProfileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [user, setUser] = useState(null);
   const pathname = usePathname();
+
+  // Get user from localStorage
+  useEffect(() => {
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
+    } catch (error) {
+      console.error('Error parsing user data from localStorage:', error);
+    }
+  }, []);
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (!user) return 'A';
+    
+    const firstInitial = user.firstName ? user.firstName.charAt(0) : '';
+    const lastInitial = user.lastName ? user.lastName.charAt(0) : '';
+    
+    return (firstInitial + lastInitial).toUpperCase() || 'A';
+  };
+
+  // Get full name
+  const getFullName = () => {
+    if (!user) return 'Admin';
+    return `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Admin';
+  };
 
   // Handle responsive sidebar
   useEffect(() => {
@@ -109,11 +138,6 @@ export default function DashboardLayout({ children }) {
   // Profile action
   const profileActions = [
     {
-      name: 'Profile',
-      icon: <FiUser className="w-5 h-5" />,
-      action: () => {/* Navigate to profile */},
-    },
-    {
       name: 'Logout',
       icon: <FiLogOut className="w-5 h-5" />,
       action: () => {/* Handle logout */},
@@ -144,17 +168,17 @@ export default function DashboardLayout({ children }) {
               onClick={() => setProfileDropdownOpen(!isProfileDropdownOpen)}
               className="flex items-center space-x-3 group focus:outline-none"
             >
-              <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600">Admin Sekolah</span>
+              <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600">{getFullName()}</span>
               <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white uppercase">
-                A
+                {getUserInitials()}
               </div>
             </button>
             
             {isProfileDropdownOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
                 <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm leading-5 font-medium text-gray-900">Admin Sekolah</p>
-                  <p className="text-xs leading-4 font-medium text-gray-500 truncate">admin@example.com</p>
+                  <p className="text-sm leading-5 font-medium text-gray-900">{getFullName()}</p>
+                  <p className="text-xs leading-4 font-medium text-gray-500 truncate">{user?.position || 'Admin'}</p>
                 </div>
                 
                 {profileActions.map((item, index) => (
