@@ -4,7 +4,7 @@ import { Document, Page, View, Text, StyleSheet, pdf } from '@react-pdf/renderer
 
 // Create PDF Document component
 const AttendanceReportPDF = ({ employees, daysInMonth, currentMonth, currentYear }) => {
-  // PDF styles with A4 Landscape dimensions
+  // PDF styles with F4 Landscape dimensions
   const styles = StyleSheet.create({
     page: {
       padding: 30,
@@ -68,7 +68,7 @@ const AttendanceReportPDF = ({ employees, daysInMonth, currentMonth, currentYear
       width: 20,
     },
     timeColumn: {
-      width: 35,
+      width: 30, // Reduced width
     },
     dayColumn: {
       width: 15,
@@ -146,7 +146,7 @@ const AttendanceReportPDF = ({ employees, daysInMonth, currentMonth, currentYear
           )}
           
           <View style={[styles.tableCol, styles.timeColumn]}>
-            <Text style={styles.tableCell}>{label}</Text>
+            <Text style={[styles.tableCell, { fontSize: 7 }]}>{label}</Text>
           </View>
           
           {dateCells}
@@ -271,15 +271,15 @@ export default function AttendanceReportTemplate() {
           onClick={downloadPdf}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
         >
-          Download PDF (A4 Landscape)
+          Download PDF (F4 Landscape)
         </button>
       </div>
 
-      {/* A4 Landscape paper size container */}
+      {/* F4 Landscape paper size container */}
       <div 
         ref={reportRef} 
         className="max-w-7xl mx-auto bg-white shadow-md p-8 text-black" 
-        style={{ width: '297mm', minHeight: '210mm', margin: '0 auto' }}
+        style={{ width: '330mm', minHeight: '210mm', margin: '0 auto' }}
       >
         {/* Header/Kop */}
         <div className="text-center border-b-2 border-black pb-4 mb-6">
@@ -314,7 +314,7 @@ export default function AttendanceReportTemplate() {
                 <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-sm align-middle w-8 text-black">No</th>
                 <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-sm align-middle w-36 text-black">Nama dan NIP</th>
                 <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-sm align-middle w-36 text-black">Jabatan</th>
-                <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-sm text-black">Waktu</th>
+                <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-xs text-black">Waktu</th>
                 {daysInMonth.map((day) => (
                   <th key={day} rowSpan="2" className="border border-gray-800 px-1 py-1 text-xs w-6 align-middle text-black">{day}</th>
                 ))}
@@ -346,7 +346,7 @@ export default function AttendanceReportTemplate() {
                     ) : null}
                     
                     {/* Show appropriate time label for each row */}
-                    <td className="border border-gray-800 px-2 py-1 text-center text-black">{label}</td>
+                    <td className="border border-gray-800 px-2 py-1 text-center text-black text-xs">{label}</td>
                     
                     {/* Date columns - one cell for each day of the month */}
                     {daysInMonth.map((day) => (
