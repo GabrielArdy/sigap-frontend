@@ -201,6 +201,7 @@ const QRCodePage = () => {
         const response = await StationService.updateStatusStation(stationInfo.stationId, "offline");
         
         if (response.status === "success") {
+          localStorage.removeItem('sid');
           showNotification("success", "Station Status Updated", "Station has been set to offline");
         } else {
           throw new Error(response.message || "Failed to update station status");

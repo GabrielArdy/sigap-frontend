@@ -21,9 +21,9 @@ const StationService = {
         }
     },
 
-    updateStatusStation: async (stationId, status) => {
+    updateStatusStation: async (stationId, stationStatus) => {
         try {
-            const response = await api.put(`/stations/`, { stationId, status });
+            const response = await api.put(`/stations/`, { stationId, stationStatus });
             return response.data;
         } catch (error) {
             return error.response.data;

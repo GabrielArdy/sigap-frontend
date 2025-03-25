@@ -91,7 +91,7 @@ const StationActivation = () => {
       localStorage.setItem('sid', selectedStation.stationId);
       
       // Update station status to active (assuming StationService has an updateStatus method)
-      await StationService.updateStatus(selectedStation.stationId, "active");
+      await StationService.updateStatusStation(selectedStation.stationId, "active");
       
       showNotification("success", "Station Activated", 
         `Station "${selectedStation.stationName}" has been activated successfully!`);
@@ -101,6 +101,7 @@ const StationActivation = () => {
         router.push('/station/view');
       }, 1000);
     } catch (error) {
+      console.error('Station activation error:', error);
       showNotification("error", "Activation Failed", "Could not activate the station. Please try again.");
     }
   };
