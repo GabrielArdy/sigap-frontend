@@ -21,13 +21,14 @@ export default function AdminLoginPage() {
     
     try {
       const response = await AuthService.loginAdmin({ email, password });
+      console.log('Login response:', response);
       
       if (response.success) {
         // Store authentication token
-        localStorage.setItem('token', response.token);
+        localStorage.setItem('token', response.data.token);
         // Store user data if needed
-        if (response.user) {
-          localStorage.setItem('user', JSON.stringify(response.user));
+        if (response.data.user) {
+          localStorage.setItem('user', JSON.stringify(response.data.user));
         }
         // Redirect to dashboard
         router.push('/admin/dashboard');
