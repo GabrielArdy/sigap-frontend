@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FiUser, FiLock, FiEye, FiEyeOff } from 'react-icons/fi';
 import Link from 'next/link';
+import AuthService from '@/app/api/auth_service';
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
@@ -19,18 +20,32 @@ export default function AdminLoginPage() {
     setIsLoading(true);
     
     try {
-      // In a real app, this would be an API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await AuthService.loginAdmin({ email, password });
       
-      // Mock validation - replace with actual authentication logic
-      if (email === 'admin@sigap.com' && password === 'admin123') {
+      if (response.success) {
+        // Store authentication token
+        localStorage.setItem('admin_token', response.token);
+        // Store user data if needed
+        if (response.user) {
+          localStorage.setItem('admin_user', JSON.stringify(response.user));
+        }
+        // Redirect to dashboard
         router.push('/admin/dashboard');
       } else {
-        setError('Email atau kata sandi tidak valid');
+        // Handle different error types
+        if (response.message === 'Invalid credentials') {
+          setError('Email atau kata sandi tidak valid');
+        } else if (response.message === 'Account not verified') {
+          setError('Akun belum diverifikasi. Silakan periksa email Anda');
+        } else if (response.message === 'Not authorized as admin') {
+          setError('Akun Anda tidak memiliki akses admin');
+        } else {
+          setError(response.message || 'Gagal login. Silakan coba lagi');
+        }
       }
     } catch (err) {
-      setError('Terjadi kesalahan saat login');
-      console.error(err);
+      setError('Terjadi kesalahan pada server. Silakan coba lagi nanti');
+      console.error('Login error:', err);
     } finally {
       setIsLoading(false);
     }

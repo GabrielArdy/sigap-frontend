@@ -27,6 +27,15 @@ const AuthService = {
             return error.response.data;
         }
     },
+
+    loginAdmin: async (data) => {
+        try {
+            const response = await api.post('/auth/admin/login', data);
+            return response.data;
+        } catch (error) {
+            return error.response.data;
+        }
+    }
 }
 
 export default AuthService;
