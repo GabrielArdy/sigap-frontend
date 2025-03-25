@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { FiSearch, FiEdit2, FiFilter, FiRefreshCw, FiCalendar } from 'react-icons/fi';
 import Swal from 'sweetalert2';
+import AttendanceService from '@/app/api/attendance_service';
 
 export default function AttendancePage() {
   const [attendanceData, setAttendanceData] = useState([]);
@@ -33,44 +34,73 @@ export default function AttendancePage() {
     { label: 'Desember', value: 12 }
   ];
   
+  // Status mapping
+  const statusMapping = {
+    'P': 'Hadir',
+    'A': 'Tidak Hadir',
+    'L': 'Izin',
+    'S': 'Sakit'
+  };
+  
   // Generate an array of years (current year - 5 to current year + 5)
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 11 }, (_, index) => currentYear - 5 + index);
 
-  // Mock data for demonstration
+  // Fetch attendance data from API
   useEffect(() => {
     setLoading(true);
     
-    // In a real app, you would fetch this data from API
-    const mockStaffList = [
-      { id: 1, name: "Ahmad Sufyan (Guru)" },
-      { id: 2, name: "Budi Santoso (Guru)" },
-      { id: 3, name: "Cindy Permata (TU)" },
-      { id: 4, name: "Dodi Pranama (Guru)" }
-    ];
+    const fetchData = async () => {
+      try {
+        const response = await AttendanceService.getAllAttendance();
+        
+        if (response.success) {
+          // Process the attendance data from API
+          const processedData = response.data.map((item) => {
+            return {
+              id: item.attendanceId,
+              date: new Date(item.date),
+              timeIn: item.checkIn ? new Date(item.checkIn).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
+              timeOut: item.checkOut ? new Date(item.checkOut).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
+              status: statusMapping[item.attendanceStatus] || 'Unknown',
+              staffName: item.fullName,
+              // Create a unique staff ID from the name if needed for filtering
+              staffId: item.fullName
+            };
+          });
+          
+          // Extract unique staff list from attendance data
+          const uniqueStaffList = Array.from(
+            new Set(processedData.map(item => item.staffName))
+          ).map((name, index) => ({
+            id: name,
+            name: name
+          }));
+          
+          setStaffList(uniqueStaffList);
+          setAttendanceData(processedData);
+          setFilteredData(processedData);
+        } else {
+          console.error("Failed to fetch attendance data");
+          Swal.fire({
+            icon: 'error',
+            title: 'Gagal memuat data',
+            text: 'Terjadi kesalahan saat memuat data kehadiran'
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching attendance data:", error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal memuat data',
+          text: 'Terjadi kesalahan saat memuat data kehadiran'
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    const mockAttendanceData = Array(30).fill().map((_, index) => {
-      const date = new Date();
-      date.setDate(date.getDate() - index);
-      
-      return {
-        id: index,
-        date: date,
-        timeIn: index % 5 === 0 ? '-' : '07:30',
-        timeOut: index % 5 === 0 ? '-' : '16:00',
-        status: index % 5 === 0 ? 'Tidak Hadir' : index % 7 === 0 ? 'Izin' : index % 11 === 0 ? 'Sakit' : 'Hadir',
-        staffId: (index % 4) + 1,
-        staffName: mockStaffList[(index % 4)].name // Add staff name to attendance data
-      };
-    });
-    
-    // Simulate API delay
-    setTimeout(() => {
-      setStaffList(mockStaffList);
-      setAttendanceData(mockAttendanceData);
-      setFilteredData(mockAttendanceData);
-      setLoading(false);
-    }, 500);
+    fetchData();
   }, []);
 
   // Handle staff selection
@@ -86,10 +116,7 @@ export default function AttendancePage() {
     
     // Apply staff filter
     if (selectedStaff !== '') {
-      const staffId = parseInt(selectedStaff);
-      if (!isNaN(staffId)) {
-        filtered = filtered.filter(item => item.staffId === staffId);
-      }
+      filtered = filtered.filter(item => item.staffId === selectedStaff);
     }
     
     // Apply period filter (month and year)
@@ -126,6 +153,12 @@ export default function AttendancePage() {
     setSelectedAttendance(attendance);
     setNewStatus(attendance.status);
     
+    // Convert from display status back to API status code
+    const reverseStatusMapping = Object.entries(statusMapping).reduce((acc, [key, value]) => {
+      acc[value] = key;
+      return acc;
+    }, {});
+    
     Swal.fire({
       title: 'Edit Status Kehadiran',
       html: `
@@ -153,8 +186,10 @@ export default function AttendancePage() {
     }).then((result) => {
       if (result.isConfirmed) {
         const newStatus = result.value;
+        const newStatusCode = reverseStatusMapping[newStatus];
         
-        // Update attendance data
+        // Here you would call the API to update the status
+        // For now, we'll just update the local state
         const updatedData = attendanceData.map(item => {
           if (item.id === attendance.id) {
             return { ...item, status: newStatus };
@@ -164,7 +199,6 @@ export default function AttendancePage() {
         
         setAttendanceData(updatedData);
         
-        // Update filtered data as well
         const updatedFiltered = filteredData.map(item => {
           if (item.id === attendance.id) {
             return { ...item, status: newStatus };

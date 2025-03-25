@@ -49,6 +49,18 @@ const AttendanceService = {
         } catch (error) {
             return error.response.data;
         }
+    },
+    getAllAttendance: async () => {
+        try {
+            const response = await api.get('/attendances/', {
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                },
+            });
+            return response.data;
+        } catch (error) {
+            return error.response.data;
+        }
     }
 }
 
