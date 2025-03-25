@@ -222,7 +222,7 @@ export default function AddAnjunganPage() {
         longitude: formData.lng
       },
       radiusThreshold: formData.radius,
-      stationStatus: "active",
+      stationStatus: "offline",
       lastActive: new Date().toISOString() // Current time as lastActive
     };
     
