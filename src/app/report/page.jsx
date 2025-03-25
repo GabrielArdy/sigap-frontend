@@ -89,7 +89,9 @@ export default function AttendanceReportPage() {
       
       // Format check-out time
       const checkOutTime = item.checkOut ? new Date(item.checkOut) : null;
-      const formattedCheckOut = checkOutTime ? 
+      // Check if checkOut is Unix epoch (1970-01-01) or null
+      const isUnixEpoch = checkOutTime && checkOutTime.getTime() <= 86400000; // One day in milliseconds
+      const formattedCheckOut = checkOutTime && !isUnixEpoch ? 
         checkOutTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
       
       // Map attendance status codes to display text
