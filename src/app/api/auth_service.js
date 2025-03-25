@@ -30,7 +30,7 @@ const AuthService = {
 
     loginAdmin: async (data) => {
         try {
-            const response = await api.post('/auth/admin/login', data);
+            const response = await api.post('/auth/login/admin', data);
             return response.data;
         } catch (error) {
             return error.response.data;
