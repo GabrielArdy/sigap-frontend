@@ -28,7 +28,7 @@ export default function Home() {
           </Link>
           
           <Link 
-            href="/admin/dashboard" 
+            href="auth/admin/login" 
             className="px-8 py-4 rounded-lg bg-gray-700 dark:bg-gray-600 text-white text-lg font-medium hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors shadow-lg flex items-center justify-center"
           >
             <span>Admin Apps</span>
