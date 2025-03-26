@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import ReportInfo from '../app/api/report_info';
 
 /**
  * Exports attendance data to an Excel file (.xlsx)
@@ -8,6 +9,9 @@ import ExcelJS from 'exceljs';
  * @param {string} currentYear - Current year
  */
 export const exportAttendanceToExcel = async (employees, daysInMonth, currentMonth, currentYear) => {
+  // Fetch report information first
+  const reportInfo = await ReportInfo.getReportInfo();
+  
   // Create a new workbook and worksheet
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Daftar Hadir', {
@@ -24,10 +28,45 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
   const centerStartCol = Math.max(1, Math.floor((totalColumns - 6) / 2));
   const centerEndCol = Math.min(totalColumns, centerStartCol + 6);
   
+  // Add logo images if available
+  if (reportInfo.ministryEmblem) {
+    try {
+      const ministryLogo = workbook.addImage({
+        base64: reportInfo.ministryEmblem,
+        extension: 'png',
+      });
+      
+      // Position to the left of the kop
+      worksheet.addImage(ministryLogo, {
+        tl: { col: Math.max(1, centerStartCol - 3), row: 1 },
+        br: { col: centerStartCol - 0.5, row: 7 }
+      });
+    } catch (error) {
+      console.error('Error adding ministry logo:', error);
+    }
+  }
+  
+  if (reportInfo.schoolEmblem) {
+    try {
+      const schoolLogo = workbook.addImage({
+        base64: reportInfo.schoolEmblem,
+        extension: 'png',
+      });
+      
+      // Position to the right of the kop
+      worksheet.addImage(schoolLogo, {
+        tl: { col: centerEndCol + 0.5, row: 1 },
+        br: { col: Math.min(totalColumns, centerEndCol + 3), row: 7 }
+      });
+    } catch (error) {
+      console.error('Error adding school logo:', error);
+    }
+  }
+  
   // First row - Kabupaten/Kota
   worksheet.mergeCells(`${getExcelColumnLetter(centerStartCol)}1:${getExcelColumnLetter(centerEndCol)}1`);
   const kabupatenCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}1`);
-  kabupatenCell.value = 'PEMERINTAH KABUPATEN/KOTA ...';
+  kabupatenCell.value = `PEMERINTAH KABUPATEN/KOTA ${reportInfo.schoolDistrict || '...'}`;
   kabupatenCell.font = { bold: true, size: 14 };
   kabupatenCell.alignment = { horizontal: 'center' };
   
@@ -41,64 +80,57 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
   // Third row - School name
   worksheet.mergeCells(`${getExcelColumnLetter(centerStartCol)}3:${getExcelColumnLetter(centerEndCol)}3`);
   const schoolNameCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}3`);
-  schoolNameCell.value = 'SMA/SMK/SMP NEGERI ...';
+  schoolNameCell.value = reportInfo.schoolName || 'SMA/SMK/SMP NEGERI ...';
   schoolNameCell.font = { bold: true, size: 16 };
   schoolNameCell.alignment = { horizontal: 'center' };
   
   // Fourth row - NPSN & NSS
   worksheet.mergeCells(`${getExcelColumnLetter(centerStartCol)}4:${getExcelColumnLetter(centerEndCol)}4`);
   const npsnCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}4`);
-  npsnCell.value = 'NPSN: 12345678 | NSS: 12345678910';
+  npsnCell.value = `NPSN: ${reportInfo.npsn || '12345678'} | NSS: ${reportInfo.nss || '12345678910'}`;
   npsnCell.font = { size: 10 };
   npsnCell.alignment = { horizontal: 'center' };
   
   // Fifth row - Address
   worksheet.mergeCells(`${getExcelColumnLetter(centerStartCol)}5:${getExcelColumnLetter(centerEndCol)}5`);
   const addressCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}5`);
-  addressCell.value = 'Alamat: Jl. Pendidikan No. 123, Telepon: (021) 12345678';
+  addressCell.value = `Alamat: ${reportInfo.schoolAddress || 'Jl. Pendidikan No. 123'}, Telepon: ${reportInfo.schoolPhone || '(021) 12345678'}`;
   addressCell.font = { size: 10 };
   addressCell.alignment = { horizontal: 'center' };
   
-  // Sixth row - Email & Website
+  // Sixth row - Accreditation (moved up since email/website row is removed)
   worksheet.mergeCells(`${getExcelColumnLetter(centerStartCol)}6:${getExcelColumnLetter(centerEndCol)}6`);
-  const contactCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}6`);
-  contactCell.value = 'Email: sekolah@example.com | Website: www.sekolah.sch.id';
-  contactCell.font = { size: 10 };
-  contactCell.alignment = { horizontal: 'center' };
-  
-  // Seventh row - Accreditation
-  worksheet.mergeCells(`${getExcelColumnLetter(centerStartCol)}7:${getExcelColumnLetter(centerEndCol)}7`);
-  const accreditationCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}7`);
+  const accreditationCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}6`);
   accreditationCell.value = 'Terakreditasi "A"';
   accreditationCell.font = { size: 10 };
   accreditationCell.alignment = { horizontal: 'center' };
   
   // Add horizontal line below header
   for (let i = centerStartCol; i <= centerEndCol; i++) {
-    worksheet.getCell(`${getExcelColumnLetter(i)}8`).border = {
+    worksheet.getCell(`${getExcelColumnLetter(i)}7`).border = {
       bottom: { style: 'medium' }
     };
   }
   
   // Space after header
-  worksheet.getRow(9).height = 10;
+  worksheet.getRow(8).height = 10;
 
   // Add title - also centered based on the total width
-  worksheet.mergeCells(`${getExcelColumnLetter(centerStartCol)}10:${getExcelColumnLetter(centerEndCol)}10`);
-  const titleCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}10`);
+  worksheet.mergeCells(`${getExcelColumnLetter(centerStartCol)}9:${getExcelColumnLetter(centerEndCol)}9`);
+  const titleCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}9`);
   titleCell.value = 'DAFTAR HADIR PEGAWAI';
   titleCell.font = { bold: true, size: 14 };
   titleCell.alignment = { horizontal: 'center' };
 
   // Add month/year subtitle
-  worksheet.mergeCells(`${getExcelColumnLetter(centerStartCol)}11:${getExcelColumnLetter(centerEndCol)}11`);
-  const subtitleCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}11`);
+  worksheet.mergeCells(`${getExcelColumnLetter(centerStartCol)}10:${getExcelColumnLetter(centerEndCol)}10`);
+  const subtitleCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}10`);
   subtitleCell.value = `Bulan: ${currentMonth} ${currentYear}`;
   subtitleCell.font = { size: 12 };
   subtitleCell.alignment = { horizontal: 'center' };
   
   // Space after title
-  worksheet.getRow(12).height = 10;
+  worksheet.getRow(11).height = 10;
 
   // Column definitions for the header row
   const headerRow = ['No', 'Nama dan NIP', 'Jabatan', 'Waktu'];
@@ -111,11 +143,11 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
   // Add the Keterangan column
   headerRow.push('Ket.');
   
-  // Add header row (now at row 13 after the kop)
+  // Add header row (now at row 12 after the kop - adjusted down from 13 due to removal of one row)
   worksheet.addRow(headerRow);
   
   // Style header row
-  const headerRowNum = 13;
+  const headerRowNum = 12; // Adjusted from 13 due to removed row
   const firstRow = worksheet.getRow(headerRowNum);
   firstRow.font = { bold: true };
   firstRow.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -233,7 +265,7 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
   const signatureRow = rowIndex + 2;
   worksheet.mergeCells(`${getExcelColumnLetter(daysInMonth.length + 3)}${signatureRow}:${getExcelColumnLetter(daysInMonth.length + 5)}${signatureRow}`);
   const placeDate = worksheet.getCell(`${getExcelColumnLetter(daysInMonth.length + 3)}${signatureRow}`);
-  placeDate.value = `..................., ${getCurrentDate()}`;
+  placeDate.value = `${reportInfo.schoolDistrict || '.....................'}, ${getCurrentDate()}`;
   placeDate.alignment = { horizontal: 'center' };
   
   worksheet.mergeCells(`${getExcelColumnLetter(daysInMonth.length + 3)}${signatureRow + 1}:${getExcelColumnLetter(daysInMonth.length + 5)}${signatureRow + 1}`);
@@ -243,13 +275,13 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
   
   worksheet.mergeCells(`${getExcelColumnLetter(daysInMonth.length + 3)}${signatureRow + 5}:${getExcelColumnLetter(daysInMonth.length + 5)}${signatureRow + 5}`);
   const name = worksheet.getCell(`${getExcelColumnLetter(daysInMonth.length + 3)}${signatureRow + 5}`);
-  name.value = 'Nama Kepala Sekolah';
+  name.value = reportInfo.pricipalName || 'Nama Kepala Sekolah';
   name.font = { bold: true, underline: true };
   name.alignment = { horizontal: 'center' };
   
   worksheet.mergeCells(`${getExcelColumnLetter(daysInMonth.length + 3)}${signatureRow + 6}:${getExcelColumnLetter(daysInMonth.length + 5)}${signatureRow + 6}`);
   const nip = worksheet.getCell(`${getExcelColumnLetter(daysInMonth.length + 3)}${signatureRow + 6}`);
-  nip.value = 'NIP. 196012121980031001';
+  nip.value = `NIP. ${reportInfo.principalNip || '196012121980031001'}`;
   nip.alignment = { horizontal: 'center' };
   
   // Generate Excel buffer
