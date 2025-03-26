@@ -4,6 +4,8 @@ import { FiMenu, FiChevronDown, FiChevronRight, FiLogOut, FiUser, FiSettings, Fi
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+
 
 export default function DashboardLayout({ children }) {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
@@ -12,6 +14,7 @@ export default function DashboardLayout({ children }) {
   const [isProfileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [user, setUser] = useState(null);
   const pathname = usePathname();
+  const router = useRouter();
 
   // Get user from localStorage
   useEffect(() => {
@@ -40,6 +43,11 @@ export default function DashboardLayout({ children }) {
     if (!user) return 'Admin';
     return `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Admin';
   };
+
+  const handleLogout = () => {
+    localStorage.clear();
+    router.push('/admin/login')
+  }
 
   // Handle responsive sidebar
   useEffect(() => {
@@ -140,7 +148,7 @@ export default function DashboardLayout({ children }) {
     {
       name: 'Logout',
       icon: <FiLogOut className="w-5 h-5" />,
-      action: () => {/* Handle logout */},
+      action: handleLogout,
     },
   ];
 

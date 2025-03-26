@@ -34,7 +34,7 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
   // Second row - Dinas Pendidikan
   worksheet.mergeCells(`${getExcelColumnLetter(centerStartCol)}2:${getExcelColumnLetter(centerEndCol)}2`);
   const dinasCell = worksheet.getCell(`${getExcelColumnLetter(centerStartCol)}2`);
-  dinasCell.value = 'DINAS PENDIDIKAN';
+  dinasCell.value = 'DINAS PENDIDIKAN DAN KEBUDAYAAN';
   dinasCell.font = { bold: true, size: 12 };
   dinasCell.alignment = { horizontal: 'center' };
   

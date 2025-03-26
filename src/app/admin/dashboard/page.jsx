@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import { FiUsers, FiCalendar, FiClock, FiActivity, FiArrowUp, FiArrowDown, FiCheckCircle, FiXCircle, FiLogIn, FiLogOut } from 'react-icons/fi';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import AttendanceService from '../../api/attendance_service';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -11,18 +12,11 @@ export default function DashboardPage() {
     totalUsers: 0,
     checkIn: { count: 0, percentage: 0 },
     checkOut: { count: 0, percentage: 0 },
-    recentActivities: []
+    recentActivities: [],
+    attendanceTrend: []
   });
-
-  // Attendance chart data - Sunday removed
-  const attendanceData = [
-    { name: 'Senin', masuk: 75, keluar: 70 },
-    { name: 'Selasa', masuk: 76, keluar: 74 },
-    { name: 'Rabu', masuk: 77, keluar: 75 },
-    { name: 'Kamis', masuk: 78, keluar: 77 },
-    { name: 'Jumat', masuk: 79, keluar: 78 },
-    { name: 'Sabtu', masuk: 65, keluar: 65 },
-  ];
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [weeklyData, setWeeklyData] = useState([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -31,6 +25,24 @@ export default function DashboardPage() {
         const response = await AttendanceService.getAdminDashboard();
         if (response.success) {
           setDashboardData(response.data);
+          
+          // Process attendance trend data for the chart
+          if (response.data.attendanceTrend && response.data.attendanceTrend.length > 0) {
+            const formattedData = response.data.attendanceTrend.map(item => {
+              const date = parseISO(item.date);
+              return {
+                name: format(date, 'EEEE', { locale: id }).charAt(0).toUpperCase() + format(date, 'EEEE', { locale: id }).slice(1),
+                masuk: item.checkIn,
+                keluar: item.checkOut,
+                fullDate: format(date, 'dd/MM')
+              };
+            });
+            setAttendanceData(formattedData);
+            
+            // Extract last week data for the table
+            const lastWeekData = formattedData.slice(-7);
+            setWeeklyData(lastWeekData);
+          }
         } else {
           console.error("Failed to fetch dashboard data:", response);
         }
@@ -67,6 +79,20 @@ export default function DashboardPage() {
     const date = new Date(timestamp);
     const today = new Date();
     return date.toDateString() === today.toDateString();
+  };
+
+  // Custom tooltip for the chart
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-3 shadow-md rounded-md border border-gray-200">
+          <p className="font-medium">{label} {payload[0]?.payload?.fullDate}</p>
+          <p className="text-sm text-green-600">Masuk: {payload[0]?.value || 0}</p>
+          <p className="text-sm text-blue-600">Keluar: {payload[1]?.value || 0}</p>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -165,7 +191,7 @@ export default function DashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
-                    <Tooltip />
+                    <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Bar dataKey="masuk" name="Masuk" fill="#22c55e" />
                     <Bar dataKey="keluar" name="Keluar" fill="#3b82f6" />
@@ -225,18 +251,26 @@ export default function DashboardPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hari</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Masuk</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keluar</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'].map((day, i) => (
-                    <tr key={day}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{day}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{75 + i}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{70 + i}</td>
+                  {weeklyData.length > 0 ? (
+                    weeklyData.map((day, i) => (
+                      <tr key={i}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{day.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{day.fullDate}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{day.masuk}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{day.keluar}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4" className="px-6 py-4 text-center text-gray-500">Tidak ada data untuk minggu ini</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>

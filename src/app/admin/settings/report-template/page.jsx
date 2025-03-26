@@ -1,8 +1,8 @@
 'use client'
-import { useState, useRef } from 'react';
-import { FiUser, FiMapPin, FiHome, FiFileText, FiCheck, FiUpload, FiPhone, FiHash } from 'react-icons/fi';
+import { useState, useRef, useEffect } from 'react';
+import { FiUser, FiMapPin, FiHome, FiFileText, FiCheck, FiUpload, FiPhone, FiHash, FiEdit } from 'react-icons/fi';
 import Swal from 'sweetalert2';
-// We don't need DragDropFilePicker anymore as we're using text inputs
+import ReportInfo from '@/app/api/report_info';
 
 export default function TemplateUploadPage() {
   // Form state for text inputs
@@ -17,6 +17,9 @@ export default function TemplateUploadPage() {
   const [schoolLogo, setSchoolLogo] = useState(null);
   const [tutWuriLogo, setTutWuriLogo] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [dataExists, setDataExists] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Refs for file inputs
   const schoolLogoRef = useRef(null);
@@ -40,6 +43,54 @@ export default function TemplateUploadPage() {
   const [schoolLogoPreview, setSchoolLogoPreview] = useState('');
   const [tutWuriLogoPreview, setTutWuriLogoPreview] = useState('');
 
+  // Fetch data on component mount
+  useEffect(() => {
+    const fetchReportInfo = async () => {
+      try {
+        setIsLoading(true);
+        const data = await ReportInfo.getReportInfo();
+        
+        if (data && data._id) {
+          setDataExists(true);
+          // Populate the form with existing data
+          setSchoolName(data.schoolName || '');
+          setSchoolAddress(data.schoolAddress || '');
+          setDistrict(data.schoolDistrict || '');
+          setPrincipalName(data.pricipalName || ''); // Note the typo in API: "pricipalName"
+          setPrincipalId(data.principalNip || '');
+          setPhoneNumber(data.schoolPhone || '');
+          setNpsn(data.npsn || '');
+          setNss(data.nss || '');
+          
+          // Set image previews if available
+          if (data.schoolEmblem) {
+            setSchoolLogoPreview(data.schoolEmblem);
+          }
+          
+          if (data.ministryEmblem) {
+            setTutWuriLogoPreview(data.ministryEmblem);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching report information:', error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal Memuat Data',
+          text: 'Gagal memuat informasi template laporan',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchReportInfo();
+  }, []);
+
+  // Toggle edit mode
+  const toggleEditMode = () => {
+    setIsEditing(!isEditing);
+  };
+
   // Handle input changes with validation
   const handleInputChange = (e, setter, fieldName) => {
     const value = e.target.value;
@@ -53,8 +104,27 @@ export default function TemplateUploadPage() {
     }
   };
 
+  // Convert base64 image to file
+  const base64ToFile = (dataUrl, filename) => {
+    if (!dataUrl) return null;
+    
+    const arr = dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    
+    return new File([u8arr], filename, { type: mime });
+  };
+
   // Handle file changes
   const handleFileChange = (e, setter, previewSetter, fieldName) => {
+    if (!isEditing) return;
+    
     const file = e.target.files[0];
     if (file) {
       // Check file type
@@ -92,8 +162,8 @@ export default function TemplateUploadPage() {
       phoneNumber: !phoneNumber.trim() ? 'Nomor Telepon harus diisi' : '',
       npsn: !npsn.trim() ? 'NPSN harus diisi' : '',
       nss: !nss.trim() ? 'NSS harus diisi' : '',
-      schoolLogo: !schoolLogo ? 'Logo Sekolah harus diunggah' : '',
-      tutWuriLogo: !tutWuriLogo ? 'Logo Tut Wuri harus diunggah' : ''
+      schoolLogo: !schoolLogoPreview ? 'Logo Sekolah harus diunggah' : '',
+      tutWuriLogo: !tutWuriLogoPreview ? 'Logo Tut Wuri harus diunggah' : ''
     };
     
     setErrors(newErrors);
@@ -121,25 +191,27 @@ export default function TemplateUploadPage() {
     try {
       // Create data object for submission
       const formData = new FormData();
-      formData.append('schoolName', schoolName);
-      formData.append('schoolAddress', schoolAddress);
-      formData.append('district', district);
-      formData.append('principalName', principalName);
-      formData.append('principalId', principalId);
-      formData.append('phoneNumber', phoneNumber);
-      formData.append('npsn', npsn);
-      formData.append('nss', nss);
-      formData.append('schoolLogo', schoolLogo);
-      formData.append('tutWuriLogo', tutWuriLogo);
       
-      // Here you would normally send the data to your API
-      // const response = await fetch('/api/report-template', {
-      //   method: 'POST',
-      //   body: formData
-      // });
+      // If we have file objects, use those, otherwise create files from the base64 data
+      const schoolLogoFile = schoolLogo || (schoolLogoPreview ? base64ToFile(schoolLogoPreview, 'school_logo.png') : null);
+      const tutWuriLogoFile = tutWuriLogo || (tutWuriLogoPreview ? base64ToFile(tutWuriLogoPreview, 'ministry_logo.png') : null);
       
-      // Simulate API call with timeout
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Create data object for API
+      const reportData = {
+        schoolName,
+        schoolAddress,
+        schoolPhone: phoneNumber,
+        schoolDistrict: district,
+        npsn,
+        nss,
+        pricipalName: principalName, // Match the API field name (with typo)
+        principalNip: principalId,
+        schoolEmblem: schoolLogoPreview,
+        ministryEmblem: tutWuriLogoPreview
+      };
+      
+      // Send data to API
+      const response = await ReportInfo.createOrUpdateReport(reportData);
       
       // Show success message
       Swal.fire({
@@ -147,6 +219,10 @@ export default function TemplateUploadPage() {
         title: 'Berhasil',
         text: 'Informasi template laporan berhasil disimpan',
       });
+      
+      // Exit edit mode and set dataExists to true
+      setIsEditing(false);
+      setDataExists(true);
       
     } catch (error) {
       console.error('Error saving template information:', error);
@@ -160,14 +236,36 @@ export default function TemplateUploadPage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <span className="ml-3 text-lg text-gray-700">Memuat data...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Pengaturan Template Laporan</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Atur informasi sekolah yang akan ditampilkan pada laporan kehadiran
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Pengaturan Template Laporan</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Atur informasi sekolah yang akan ditampilkan pada laporan kehadiran
+          </p>
+        </div>
+        
+        {!isEditing && dataExists && (
+          <button
+            type="button"
+            onClick={toggleEditMode}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <FiEdit className="mr-2 -ml-1 h-5 w-5" />
+            Perbarui Informasi
+          </button>
+        )}
       </div>
       
       {/* Input form */}
@@ -188,8 +286,9 @@ export default function TemplateUploadPage() {
                 name="schoolName"
                 value={schoolName}
                 onChange={(e) => handleInputChange(e, setSchoolName, 'Nama Sekolah')}
-                className="block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                className={`block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 ${!isEditing && dataExists ? 'bg-gray-100' : ''}`}
                 placeholder="Masukkan nama sekolah"
+                disabled={!isEditing && dataExists}
               />
             </div>
             {errors.schoolName && (
@@ -214,8 +313,9 @@ export default function TemplateUploadPage() {
                 name="npsn"
                 value={npsn}
                 onChange={(e) => handleInputChange(e, setNpsn, 'NPSN')}
-                className="block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                className={`block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 ${!isEditing && dataExists ? 'bg-gray-100' : ''}`}
                 placeholder="Masukkan NPSN sekolah"
+                disabled={!isEditing && dataExists}
               />
             </div>
             {errors.npsn && (
@@ -240,8 +340,9 @@ export default function TemplateUploadPage() {
                 name="nss"
                 value={nss}
                 onChange={(e) => handleInputChange(e, setNss, 'NSS')}
-                className="block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                className={`block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 ${!isEditing && dataExists ? 'bg-gray-100' : ''}`}
                 placeholder="Masukkan NSS sekolah"
+                disabled={!isEditing && dataExists}
               />
             </div>
             {errors.nss && (
@@ -266,8 +367,9 @@ export default function TemplateUploadPage() {
                 name="schoolAddress"
                 value={schoolAddress}
                 onChange={(e) => handleInputChange(e, setSchoolAddress, 'Alamat Sekolah')}
-                className="block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                className={`block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 ${!isEditing && dataExists ? 'bg-gray-100' : ''}`}
                 placeholder="Masukkan alamat sekolah"
+                disabled={!isEditing && dataExists}
               />
             </div>
             {errors.schoolAddress && (
@@ -292,8 +394,9 @@ export default function TemplateUploadPage() {
                 name="phoneNumber"
                 value={phoneNumber}
                 onChange={(e) => handleInputChange(e, setPhoneNumber, 'Nomor Telepon')}
-                className="block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                className={`block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 ${!isEditing && dataExists ? 'bg-gray-100' : ''}`}
                 placeholder="Masukkan nomor telepon sekolah"
+                disabled={!isEditing && dataExists}
               />
             </div>
             {errors.phoneNumber && (
@@ -318,8 +421,9 @@ export default function TemplateUploadPage() {
                 name="district"
                 value={district}
                 onChange={(e) => handleInputChange(e, setDistrict, 'Kabupaten/Kota')}
-                className="block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                className={`block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 ${!isEditing && dataExists ? 'bg-gray-100' : ''}`}
                 placeholder="Masukkan kabupaten/kota"
+                disabled={!isEditing && dataExists}
               />
             </div>
             {errors.district && (
@@ -344,8 +448,9 @@ export default function TemplateUploadPage() {
                 name="principalName"
                 value={principalName}
                 onChange={(e) => handleInputChange(e, setPrincipalName, 'Nama Kepala Sekolah')}
-                className="block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                className={`block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 ${!isEditing && dataExists ? 'bg-gray-100' : ''}`}
                 placeholder="Masukkan nama lengkap kepala sekolah"
+                disabled={!isEditing && dataExists}
               />
             </div>
             {errors.principalName && (
@@ -370,8 +475,9 @@ export default function TemplateUploadPage() {
                 name="principalId"
                 value={principalId}
                 onChange={(e) => handleInputChange(e, setPrincipalId, 'NIP Kepala Sekolah')}
-                className="block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                className={`block w-full pl-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 ${!isEditing && dataExists ? 'bg-gray-100' : ''}`}
                 placeholder="Masukkan NIP kepala sekolah"
+                disabled={!isEditing && dataExists}
               />
             </div>
             {errors.principalId && (
@@ -387,14 +493,17 @@ export default function TemplateUploadPage() {
               Logo Sekolah <span className="text-red-500">*</span>
             </label>
             <div className="mt-1 flex items-center space-x-4">
-              <button
-                type="button"
-                onClick={() => schoolLogoRef.current.click()}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <FiUpload className="mr-2 -ml-1 h-5 w-5" />
-                {schoolLogo ? 'Ganti Logo' : 'Unggah Logo'}
-              </button>
+              {(isEditing || !dataExists) && (
+                <button
+                  type="button"
+                  onClick={() => schoolLogoRef.current.click()}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  disabled={!isEditing && dataExists}
+                >
+                  <FiUpload className="mr-2 -ml-1 h-5 w-5" />
+                  {schoolLogoPreview ? 'Ganti Logo' : 'Unggah Logo'}
+                </button>
+              )}
               
               <input
                 type="file"
@@ -403,6 +512,7 @@ export default function TemplateUploadPage() {
                 onChange={(e) => handleFileChange(e, setSchoolLogo, setSchoolLogoPreview, 'schoolLogo')}
                 accept="image/*"
                 className="hidden"
+                disabled={!isEditing && dataExists}
               />
               
               {schoolLogoPreview && (
@@ -435,14 +545,17 @@ export default function TemplateUploadPage() {
               Logo Tut Wuri <span className="text-red-500">*</span>
             </label>
             <div className="mt-1 flex items-center space-x-4">
-              <button
-                type="button"
-                onClick={() => tutWuriLogoRef.current.click()}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <FiUpload className="mr-2 -ml-1 h-5 w-5" />
-                {tutWuriLogo ? 'Ganti Logo' : 'Unggah Logo'}
-              </button>
+              {(isEditing || !dataExists) && (
+                <button
+                  type="button"
+                  onClick={() => tutWuriLogoRef.current.click()}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  disabled={!isEditing && dataExists}
+                >
+                  <FiUpload className="mr-2 -ml-1 h-5 w-5" />
+                  {tutWuriLogoPreview ? 'Ganti Logo' : 'Unggah Logo'}
+                </button>
+              )}
               
               <input
                 type="file"
@@ -451,6 +564,7 @@ export default function TemplateUploadPage() {
                 onChange={(e) => handleFileChange(e, setTutWuriLogo, setTutWuriLogoPreview, 'tutWuriLogo')}
                 accept="image/*"
                 className="hidden"
+                disabled={!isEditing && dataExists}
               />
               
               {tutWuriLogoPreview && (
@@ -499,30 +613,42 @@ export default function TemplateUploadPage() {
             </div>
           </div>
           
-          {/* Submit button */}
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
-                isSubmitting ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Menyimpan...
-                </>
-              ) : (
-                <>
-                  <FiCheck className="mr-2 -ml-1 h-5 w-5" />
-                  Simpan Informasi
-                </>
-              )}
-            </button>
+          {/* Action buttons */}
+          <div className="flex justify-end space-x-3">
+            {isEditing && (
+              <button
+                type="button"
+                onClick={toggleEditMode}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Batal
+              </button>
+            )}
+            
+            {(isEditing || !dataExists) && (
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
+                  isSubmitting ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+                }`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Menyimpan...
+                  </>
+                ) : (
+                  <>
+                    <FiCheck className="mr-2 -ml-1 h-5 w-5" />
+                    {dataExists ? 'Simpan Perubahan' : 'Simpan Informasi'}
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </form>
       </div>

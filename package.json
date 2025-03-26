@@ -16,6 +16,7 @@
     "@react-pdf/renderer": "^4.3.0",
     "antd": "^5.24.4",
     "axios": "^1.8.3",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "exceljs": "^4.4.0",
     "html5-qrcode": "^2.3.8",
