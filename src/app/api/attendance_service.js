@@ -13,6 +13,18 @@ const AttendanceService = {
             return error.response.data;
         }
     },
+    getAdminDashboard: async () => {
+        try {
+            const response = await api.get('/admin/dashboard', {
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                },
+            });
+            return response.data;
+        } catch (error) {
+            return error.response.data;
+        }
+    },
     recordCheckInTime: async (attendanceData) => {
         try {
             const response = await api.post('/attendances/checkIn', attendanceData, {

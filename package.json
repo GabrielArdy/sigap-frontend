@@ -17,6 +17,7 @@
     "antd": "^5.24.4",
     "axios": "^1.8.3",
     "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0",
     "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
     "leaflet-control-geocoder": "^3.1.0",

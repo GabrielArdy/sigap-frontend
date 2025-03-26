@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Document, Page, View, Text, StyleSheet, pdf } from '@react-pdf/renderer';
+import { exportAttendanceToExcel } from '@/utils/excelExport';
 
 // Create PDF Document component
 const AttendanceReportPDF = ({ employees, daysInMonth, currentMonth, currentYear }) => {
@@ -59,10 +60,10 @@ const AttendanceReportPDF = ({ employees, daysInMonth, currentMonth, currentYear
       textAlign: 'center',
     },
     nameColumn: {
-      width: 90,
+      width: 110, // Increased from 90 to 110
     },
     positionColumn: {
-      width: 80,
+      width: 40, // Reduced from 50 to 40
     },
     numberColumn: {
       width: 20,
@@ -71,10 +72,10 @@ const AttendanceReportPDF = ({ employees, daysInMonth, currentMonth, currentYear
       width: 30, // Reduced width
     },
     dayColumn: {
-      width: 15,
+      width: 30, // Increased from 25 to 30 to accommodate HH:MM format better
     },
     notesColumn: {
-      width: 70,
+      width: 40, // Reduced from 50 to 40
     },
     nameText: {
       fontSize: 8,
@@ -186,7 +187,7 @@ const AttendanceReportPDF = ({ employees, daysInMonth, currentMonth, currentYear
             </View>
             {dateColumns}
             <View style={[styles.tableCol, styles.notesColumn]}>
-              <Text style={styles.tableHeaderCell}>Keterangan</Text>
+              <Text style={styles.tableHeaderCell}>Ket.</Text>
             </View>
           </View>
           
@@ -236,9 +237,9 @@ export default function AttendanceReportTemplate() {
 
   // Sample data for demonstration
   const employees = [
-    { id: 1, name: 'Budi Santoso', nip: '19850612 200901 1 001', position: 'Guru Matematika' },
-    { id: 2, name: 'Siti Rahayu', nip: '19880824 201001 2 003', position: 'Guru Bahasa Indonesia' },
-    { id: 3, name: 'Ahmad Fahri', nip: '19770315 199803 1 002', position: 'Guru IPA' },
+    { id: 1, name: 'Budi Santoso', nip: '19850612 200901 1 001', position: 'Guru' },
+    { id: 2, name: 'Siti Rahayu', nip: '19880824 201001 2 003', position: 'Guru' },
+    { id: 3, name: 'Ahmad Fahri', nip: '19770315 199803 1 002', position: 'TU' },
   ];
 
   // Function to download the PDF directly
@@ -263,15 +264,27 @@ export default function AttendanceReportTemplate() {
     }
   };
 
+  // Function to export to Excel
+  const handleExcelExport = () => {
+    exportAttendanceToExcel(employees, daysInMonth, currentMonth, currentYear);
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      {/* Download button */}
-      <div className="max-w-7xl mx-auto mb-4">
+      {/* Download buttons */}
+      <div className="max-w-7xl mx-auto mb-4 flex gap-4">
         <button
           onClick={downloadPdf}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
         >
           Download PDF (F4 Landscape)
+        </button>
+        
+        <button
+          onClick={handleExcelExport}
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
+        >
+          Download Excel (.xlsx)
         </button>
       </div>
 
@@ -293,8 +306,10 @@ export default function AttendanceReportTemplate() {
               <h1 className="text-xl font-bold uppercase text-black">Pemerintah Kabupaten/Kota ...</h1>
               <h2 className="text-lg font-bold text-black">DINAS PENDIDIKAN</h2>
               <h1 className="text-2xl font-bold mt-1 text-black">SMA/SMK/SMP NEGERI ...</h1>
+              <p className="text-sm text-black">NPSN: 12345678 | NSS: 12345678910</p>
               <p className="text-sm text-black">Alamat: Jl. Pendidikan No. 123, Telepon: (021) 12345678</p>
               <p className="text-sm text-black">Email: sekolah@example.com | Website: www.sekolah.sch.id</p>
+              <p className="text-sm text-black">Terakreditasi "A"</p>
             </div>
           </div>
         </div>
@@ -312,13 +327,13 @@ export default function AttendanceReportTemplate() {
             <thead>
               <tr className="bg-gray-200">
                 <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-sm align-middle w-8 text-black">No</th>
-                <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-sm align-middle w-36 text-black">Nama dan NIP</th>
-                <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-sm align-middle w-36 text-black">Jabatan</th>
+                <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-sm align-middle w-44 text-black">Nama dan NIP</th>
+                <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-sm align-middle w-20 text-black">Jabatan</th>
                 <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-xs text-black">Waktu</th>
                 {daysInMonth.map((day) => (
-                  <th key={day} rowSpan="2" className="border border-gray-800 px-1 py-1 text-xs w-6 align-middle text-black">{day}</th>
+                  <th key={day} rowSpan="2" className="border border-gray-800 px-1 py-1 text-xs w-14 align-middle text-black">{day}</th>
                 ))}
-                <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-sm align-middle w-24 text-black">Keterangan</th>
+                <th rowSpan="2" className="border border-gray-800 px-2 py-1 text-sm align-middle w-12 text-black">Ket.</th>
               </tr>
               <tr className="bg-gray-200">
                 {/* Empty row for alignment */}
