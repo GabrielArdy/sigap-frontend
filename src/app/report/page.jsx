@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { FaArrowLeft, FaDownload, FaCalendarAlt, FaUser } from 'react-icons/fa';
 import AttendanceService from '../api/attendance_service';
+import ReportInfo from '../api/report_info';
+import { exportAttendanceToExcel } from '@/utils/excelExport';
 
 export default function AttendanceReportPage() {
   const [selectedMonth, setSelectedMonth] = useState('');
@@ -11,6 +13,7 @@ export default function AttendanceReportPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [attendanceReportData, setAttendanceReportData] = useState(null);
   
   // Load user data from local storage
   useEffect(() => {
@@ -26,6 +29,21 @@ export default function AttendanceReportPage() {
       console.error("Error loading user data:", err);
       setError("Failed to load user data");
     }
+  }, []);
+
+  useEffect(() => {
+    const fetchAttendanceData = async () => {
+      try {
+        const response = await ReportInfo.getReportData();
+        if (response.success && response.data) {
+          setAttendanceReportData(response.data);
+        }
+      } catch (error) {
+        console.error("Error fetching report data:", error);
+      }
+    };
+    
+    fetchAttendanceData();
   }, []);
 
   // Generate last 6 months for selection
@@ -129,8 +147,57 @@ export default function AttendanceReportPage() {
   
   // Function to handle report download
   const handleDownloadReport = () => {
-    alert('Download laporan untuk bulan ' + selectedMonth);
-    // In a real app, this would trigger a PDF or Excel download
+    if (!selectedMonth) return;
+    
+    // Parse month and year from selectedMonth (format: YYYY-MM)
+    const [year, month] = selectedMonth.split('-');
+    const monthIndex = parseInt(month) - 1; // Convert to 0-indexed month
+    
+    // Get month name in Indonesian
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    const monthName = monthNames[monthIndex];
+    
+    // Get days in the selected month
+    const daysInMonth = Array.from(
+      { length: new Date(parseInt(year), parseInt(month), 0).getDate() }, 
+      (_, i) => i + 1
+    );
+    
+    // Generate employee data for Excel export
+    const employees = [];
+    
+    if (attendanceReportData && attendanceReportData.attendancesData) {
+      // Use the data from attendanceReportData
+      let employeeId = 1;
+      attendanceReportData.attendancesData.forEach(employee => {
+        employees.push({
+          id: employeeId++,
+          name: employee.fullName,
+          nip: employee.nip !== 'N/A' ? employee.nip : '',
+          position: employee.position
+        });
+      });
+    } else if (userData) {
+      // Fallback to using just the current user's data
+      employees.push({
+        id: 1,
+        name: userData.fullName,
+        nip: userData.nip || '',
+        position: userData.position || ''
+      });
+    }
+    
+    // Call the Excel export function
+    exportAttendanceToExcel(
+      employees,
+      daysInMonth,
+      monthName,
+      year,
+      attendanceReportData
+    );
   };
 
   return (
