@@ -57,9 +57,16 @@ export default function AttendancePage() {
         if (response.success) {
           // Process the attendance data from API
           const processedData = response.data.map((item) => {
+            // Check if checkIn is epoch date (1970-01-01) or invalid
+            const checkInDate = item.checkIn ? new Date(item.checkIn) : null;
+            const isCheckInEpoch = checkInDate && 
+              (checkInDate.getFullYear() === 1970 && 
+               checkInDate.getMonth() === 0 && 
+               checkInDate.getDate() === 1);
+            
             // Check if checkOut is epoch date (1970-01-01) or invalid
             const checkOutDate = item.checkOut ? new Date(item.checkOut) : null;
-            const isEpochDate = checkOutDate && 
+            const isCheckOutEpoch = checkOutDate && 
               (checkOutDate.getFullYear() === 1970 && 
                checkOutDate.getMonth() === 0 && 
                checkOutDate.getDate() === 1);
@@ -67,8 +74,9 @@ export default function AttendancePage() {
             return {
               id: item.attendanceId,
               date: new Date(item.date),
-              timeIn: item.checkIn ? new Date(item.checkIn).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
-              timeOut: item.checkOut && !isEpochDate ? 
+              timeIn: item.checkIn && !isCheckInEpoch ? 
+                new Date(item.checkIn).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
+              timeOut: item.checkOut && !isCheckOutEpoch ? 
                 new Date(item.checkOut).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
               status: statusMapping[item.attendanceStatus] || 'Unknown',
               staffName: item.fullName,
