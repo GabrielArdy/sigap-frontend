@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { FiSearch, FiPlus, FiEdit2, FiSave, FiX, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import Swal from 'sweetalert2';
+import { getAllAdminAccessData, updateAdminAccessData } from '@/app/api/user_service';
 
 export default function AdminAccessPage() {
   // State for users data and pagination
@@ -41,39 +42,19 @@ export default function AdminAccessPage() {
     setCurrentPage(1);
   }, [filteredUsers, itemsPerPage]);
 
-  // Example function to fetch users - replace with actual API call
+  // Function to fetch users from the API
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // In a real app, replace this with your API call
-      // const response = await fetch('/api/admin/users');
-      // const data = await response.json();
+      const response = await getAllAdminAccessData();
       
-      // Mock data for demonstration
-      const mockUsers = [
-        { id: 1, email: 'john.doe@example.com', fullName: 'John Doe', isAdmin: true },
-        { id: 2, email: 'jane.smith@example.com', fullName: 'Jane Smith', isAdmin: true },
-        { id: 3, email: 'ahmad.hassan@example.com', fullName: 'Ahmad Hassan', isAdmin: false },
-        { id: 4, email: 'sarah.johnson@example.com', fullName: 'Sarah Johnson', isAdmin: false },
-        { id: 5, email: 'michael.brown@example.com', fullName: 'Michael Brown', isAdmin: false },
-        { id: 6, email: 'lisa.wong@example.com', fullName: 'Lisa Wong', isAdmin: false },
-        { id: 7, email: 'david.miller@example.com', fullName: 'David Miller', isAdmin: false },
-        { id: 8, email: 'emma.wilson@example.com', fullName: 'Emma Wilson', isAdmin: true },
-        { id: 9, email: 'robert.taylor@example.com', fullName: 'Robert Taylor', isAdmin: false },
-        { id: 10, email: 'olivia.martinez@example.com', fullName: 'Olivia Martinez', isAdmin: false },
-        { id: 11, email: 'james.anderson@example.com', fullName: 'James Anderson', isAdmin: false },
-        { id: 12, email: 'sophia.garcia@example.com', fullName: 'Sophia Garcia', isAdmin: false },
-        { id: 13, email: 'benjamin.lopez@example.com', fullName: 'Benjamin Lopez', isAdmin: false },
-        { id: 14, email: 'isabella.lee@example.com', fullName: 'Isabella Lee', isAdmin: false },
-        { id: 15, email: 'william.harris@example.com', fullName: 'William Harris', isAdmin: true },
-      ];
+      if (response.success) {
+        setUsers(response.data);
+      } else {
+        throw new Error('Failed to fetch admin users');
+      }
       
-      // Simulate API delay
-      setTimeout(() => {
-        setUsers(mockUsers);
-        setLoading(false);
-      }, 800);
-      
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching users:', error);
       setLoading(false);
@@ -121,31 +102,33 @@ export default function AdminAccessPage() {
   // Toggle admin status
   const toggleAdminStatus = async (userId) => {
     try {
-      const userIndex = users.findIndex(u => u.id === userId);
+      const userIndex = users.findIndex(u => u.userId === userId);
       if (userIndex === -1) return;
       
       const updatedUsers = [...users];
-      updatedUsers[userIndex] = {
-        ...updatedUsers[userIndex],
-        isAdmin: !updatedUsers[userIndex].isAdmin
-      };
+      const newAdminStatus = !updatedUsers[userIndex].isAdmin;
       
-      // In a real app, make API call here:
-      // await fetch(`/api/admin/users/${userId}`, {
-      //   method: 'PATCH',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ isAdmin: updatedUsers[userIndex].isAdmin })
-      // });
+      // Make API call to update admin status
+      const response = await updateAdminAccessData(userId, newAdminStatus);
       
-      setUsers(updatedUsers);
-      
-      Swal.fire({
-        icon: 'success',
-        title: 'Updated',
-        text: `Admin access ${updatedUsers[userIndex].isAdmin ? 'granted to' : 'revoked from'} ${updatedUsers[userIndex].fullName}`,
-        showConfirmButton: false,
-        timer: 1500
-      });
+      if (response && response.success) {
+        updatedUsers[userIndex] = {
+          ...updatedUsers[userIndex],
+          isAdmin: newAdminStatus
+        };
+        
+        setUsers(updatedUsers);
+        
+        Swal.fire({
+          icon: 'success',
+          title: 'Updated',
+          text: `Admin access ${newAdminStatus ? 'granted to' : 'revoked from'} ${updatedUsers[userIndex].fullName}`,
+          showConfirmButton: false,
+          timer: 1500
+        });
+      } else {
+        throw new Error('Failed to update admin status');
+      }
     } catch (error) {
       console.error('Error updating admin status:', error);
       Swal.fire({
@@ -187,9 +170,9 @@ export default function AdminAccessPage() {
       // const data = await response.json();
       
       // Mock adding new user
-      const newUserId = Math.max(...users.map(u => u.id)) + 1;
+      const newUserId = Math.random().toString(36).substring(2, 15);
       const addedUser = {
-        id: newUserId,
+        userId: newUserId,
         ...newUser
       };
       
@@ -302,7 +285,7 @@ export default function AdminAccessPage() {
                   const realIndex = (currentPage - 1) * itemsPerPage + index + 1;
                   
                   return (
-                    <tr key={user.id} className={`${user.isAdmin ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                    <tr key={user.userId} className={`${user.isAdmin ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {realIndex}
                       </td>
@@ -316,7 +299,7 @@ export default function AdminAccessPage() {
                         {/* Toggle switch */}
                         <div className="flex items-center justify-center">
                           <button
-                            onClick={() => toggleAdminStatus(user.id)}
+                            onClick={() => toggleAdminStatus(user.userId)}
                             className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none ${
                               user.isAdmin ? 'bg-blue-600' : 'bg-gray-200'
                             }`}

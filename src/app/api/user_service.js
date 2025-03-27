@@ -59,7 +59,6 @@ export const deleteUser = async (userId) => {
   }
 };
 
-// getUserById
 /**
  * Fetch a user by ID
  * @param {string|number} userId - The ID of the user to fetch
@@ -74,3 +73,38 @@ export const getUserById = async (userId) => {
     throw error;
   }
 }
+
+/**
+ * Fetch all admin access data
+ * @returns {Promise} Promise object representing the API response
+ */
+export const getAllAdminAccessData = async () => {
+  try {
+    const response = await api.get('/admin/users/access');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching admin access data:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update admin access data
+ * @param {string} userId - The ID of the user to update
+ * @param {boolean} accessData - Updated access data
+ * @returns {Promise} Promise object representing the API response
+ */
+export const updateAdminAccessData = async (userId, accessData) => {
+  try {
+    const response = await api.put('/admin/users/access', {
+      userId,
+      isAdmin: accessData
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating admin access data:', error);
+    throw error;
+  }
+}
+
+
