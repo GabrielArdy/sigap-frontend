@@ -46,7 +46,7 @@ export default function DashboardLayout({ children }) {
 
   const handleLogout = () => {
     localStorage.clear();
-    router.push('/admin/login')
+    router.push('/auth/admin/login')
   }
 
   // Handle responsive sidebar
