@@ -23,11 +23,12 @@ const ReportInfo = {
             const month = currentDate.getMonth() + 1;
             const year = currentDate.getFullYear();
             const response = await api.get(`/admin/report?month=${month}&year=${year}`);
+            
+            // No need for complex transformations, just return the data as-is
             return response.data;
         } catch (error) {
             return error.response.data;
         }
-
     }
 }
 

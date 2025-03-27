@@ -2,9 +2,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Document, Page, View, Text, StyleSheet, pdf } from '@react-pdf/renderer';
 import { exportAttendanceToExcel } from '@/utils/excelExport';
+import ReportInfo from '../api/report_info';
 
 // Create PDF Document component
-const AttendanceReportPDF = ({ employees, daysInMonth, currentMonth, currentYear }) => {
+const AttendanceReportPDF = ({ employees, daysInMonth, currentMonth, currentYear, attendanceData }) => {
   // PDF styles with F4 Landscape dimensions
   const styles = StyleSheet.create({
     page: {
@@ -108,6 +109,36 @@ const AttendanceReportPDF = ({ employees, daysInMonth, currentMonth, currentYear
   // Generate rows for each employee
   const employeeRows = [];
   
+  // Map attendance data if available
+  const attendanceMap = new Map();
+  if (attendanceData && attendanceData.attendancesData) {
+    attendanceData.attendancesData.forEach(employee => {
+      // Skip employees with NIP "N/A"
+      if (employee.nip !== 'N/A') {
+        const attendanceByDate = new Map();
+        
+        if (employee.attendanceData && employee.attendanceData.length > 0) {
+          employee.attendanceData.forEach(record => {
+            const date = new Date(record.date);
+            const day = date.getDate();
+            
+            attendanceByDate.set(day, {
+              checkIn: record.checkIn && record.checkIn !== '1970-01-01T00:00:00.000Z' ? new Date(record.checkIn) : null,
+              checkOut: record.checkOut && record.checkOut !== '1970-01-01T00:00:00.000Z' ? new Date(record.checkOut) : null,
+              status: record.status
+            });
+          });
+        }
+        
+        attendanceMap.set(employee.nip, {
+          name: employee.fullName,
+          position: employee.position,
+          attendance: attendanceByDate
+        });
+      }
+    });
+  }
+  
   employees.forEach((employee, empIndex) => {
     const timeLabels = ['Tiba', 'Paraf', 'Pulang', 'Paraf'];
     
@@ -115,9 +146,37 @@ const AttendanceReportPDF = ({ employees, daysInMonth, currentMonth, currentYear
       const dateCells = [];
       
       for (let i = 0; i < daysInMonth.length; i++) {
+        const day = i + 1;
+        let cellContent = '';
+        
+        // Check if we have attendance data for this employee
+        const employeeData = attendanceMap.get(employee.nip);
+        if (employeeData && employeeData.attendance.has(day)) {
+          const dayData = employeeData.attendance.get(day);
+          
+          // Handle different time labels
+          if (label === 'Tiba' && dayData.checkIn) {
+            cellContent = formatTime(dayData.checkIn);
+          } else if (label === 'Pulang' && dayData.checkOut) {
+            cellContent = formatTime(dayData.checkOut);
+          } else if (label === 'Paraf') {
+            // Add checkmark for paraf if corresponding time exists
+            if (timeIndex === 1 && dayData.checkIn) { // Paraf for arrival
+              cellContent = '✓';
+            } else if (timeIndex === 3 && dayData.checkOut) { // Paraf for departure
+              cellContent = '✓';
+            }
+          }
+          
+          // Show status indicators in both Tiba and Pulang rows (timeIndex 0 and 2)
+          if ((timeIndex === 0 || timeIndex === 2) && ['Sick', 'Leave'].includes(dayData.status)) {
+            cellContent = dayData.status === 'Sick' ? 'S' : 'C';
+          }
+        }
+        
         dateCells.push(
           <View style={[styles.tableCol, styles.dayColumn]} key={`cell-${empIndex}-${timeIndex}-${i}`}>
-            <Text style={styles.tableCell}></Text>
+            <Text style={styles.tableCell}>{cellContent}</Text>
           </View>
         );
       }
@@ -212,6 +271,8 @@ export default function AttendanceReportTemplate() {
   const [currentMonth, setCurrentMonth] = useState('');
   const [currentYear, setCurrentYear] = useState('');
   const [isPdfReady, setIsPdfReady] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [attendanceData, setAttendanceData] = useState(null);
   const reportRef = useRef(null);
 
   useEffect(() => {
@@ -233,14 +294,58 @@ export default function AttendanceReportTemplate() {
     setDaysInMonth(daysArray);
     setCurrentMonth(monthNames[month]);
     setCurrentYear(year);
+    
+    // Fetch attendance data from the API
+    const fetchAttendanceData = async () => {
+      try {
+        const response = await ReportInfo.getReportData();
+        if (response.success && response.data) {
+          console.log('Attendance data received:', response.data);
+          console.log('Total attendances data:', response.data.attendancesData?.length || 0);
+          setAttendanceData(response.data);
+          
+          // Process employee data from the API response
+          const employeesList = [];
+          let employeeId = 1;
+          
+          if (response.data.attendancesData && response.data.attendancesData.length > 0) {
+            response.data.attendancesData.forEach(employee => {
+              // Include all employees, even with NIP "N/A"
+              employeesList.push({
+                id: employeeId++,
+                name: employee.fullName,
+                // Only show NIP if it's not "N/A"
+                nip: employee.nip !== 'N/A' ? employee.nip : '',
+                position: employee.position
+              });
+            });
+          }
+          
+          console.log('Processed employees list:', employeesList.length);
+          setEmployees(employeesList);
+          
+          // If API provides month/year info, update the state
+          if (response.data.meta) {
+            if (response.data.meta.month !== undefined) {
+              setCurrentMonth(monthNames[response.data.meta.month - 1]);
+            }
+            if (response.data.meta.year !== undefined) {
+              setCurrentYear(response.data.meta.year);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching attendance data:', error);
+        // Set default employees if API call fails
+        setEmployees([
+          { id: 1, name: 'John Doe', nip: '123456789', position: 'Kepala Sekolah' },
+          { id: 2, name: 'Jane Smith', nip: '987654321', position: 'Guru' }
+        ]);
+      }
+    };
+    
+    fetchAttendanceData();
   }, []);
-
-  // Sample data for demonstration
-  const employees = [
-    { id: 1, name: 'Budi Santoso', nip: '19850612 200901 1 001', position: 'Guru' },
-    { id: 2, name: 'Siti Rahayu', nip: '19880824 201001 2 003', position: 'Guru' },
-    { id: 3, name: 'Ahmad Fahri', nip: '19770315 199803 1 002', position: 'TU' },
-  ];
 
   // Function to download the PDF directly
   const downloadPdf = async () => {
@@ -250,7 +355,8 @@ export default function AttendanceReportTemplate() {
           employees={employees} 
           daysInMonth={daysInMonth} 
           currentMonth={currentMonth} 
-          currentYear={currentYear} 
+          currentYear={currentYear}
+          attendanceData={attendanceData}
         />
       ).toBlob();
       const url = URL.createObjectURL(blob);
@@ -266,7 +372,20 @@ export default function AttendanceReportTemplate() {
 
   // Function to export to Excel
   const handleExcelExport = () => {
-    exportAttendanceToExcel(employees, daysInMonth, currentMonth, currentYear);
+    exportAttendanceToExcel(employees, daysInMonth, currentMonth, currentYear, attendanceData);
+  };
+
+  // Helper function to format time as HH:MM
+  const formatTime = (dateTime) => {
+    if (!dateTime) return '';
+    
+    const date = new Date(dateTime);
+    if (date.getTime() === 0) return '';
+    
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    
+    return `${hours}:${minutes}`;
   };
 
   return (
@@ -406,4 +525,17 @@ function currentDate() {
   const year = now.getFullYear();
   
   return `${day} ${month} ${year}`;
+}
+
+// Helper function to format time as HH:MM - also exposed outside of component
+function formatTime(dateTime) {
+  if (!dateTime) return '';
+  
+  const date = new Date(dateTime);
+  if (date.getTime() === 0) return '';
+  
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  
+  return `${hours}:${minutes}`;
 }

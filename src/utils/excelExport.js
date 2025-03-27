@@ -7,10 +7,23 @@ import ReportInfo from '../app/api/report_info';
  * @param {Array} daysInMonth - Array of days in the month
  * @param {string} currentMonth - Current month name
  * @param {string} currentYear - Current year
+ * @param {Object} attendanceData - Attendance data from API (optional)
  */
-export const exportAttendanceToExcel = async (employees, daysInMonth, currentMonth, currentYear) => {
+export const exportAttendanceToExcel = async (employees, daysInMonth, currentMonth, currentYear, attendanceData = null) => {
   // Fetch report information first
   const reportInfo = await ReportInfo.getReportInfo();
+  
+  // If no attendance data is provided, try to fetch it
+  if (!attendanceData) {
+    try {
+      const reportData = await ReportInfo.getReportData();
+      if (reportData.success && reportData.data) {
+        attendanceData = reportData.data;
+      }
+    } catch (error) {
+      console.error('Error fetching attendance data:', error);
+    }
+  }
   
   // Create a new workbook and worksheet
   const workbook = new ExcelJS.Workbook();
@@ -153,10 +166,69 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
   firstRow.alignment = { horizontal: 'center', vertical: 'middle' };
   firstRow.height = 20;
   
+  // Map attendance data if available
+  const attendanceMap = new Map();
+  let employeesList = [...employees]; // Create a copy of the original employees list
+  
+  if (attendanceData && attendanceData.attendancesData) {
+    console.log('Excel export - Total employees from API:', attendanceData.attendancesData.length);
+    
+    // Transform API data to a more usable format
+    attendanceData.attendancesData.forEach(employee => {
+      const attendanceByDate = new Map();
+      
+      if (employee.attendanceData && employee.attendanceData.length > 0) {
+        employee.attendanceData.forEach(record => {
+          const date = new Date(record.date);
+          const day = date.getDate();
+          
+          attendanceByDate.set(day, {
+            checkIn: record.checkIn && record.checkIn !== '1970-01-01T00:00:00.000Z' ? new Date(record.checkIn) : null,
+            checkOut: record.checkOut && record.checkOut !== '1970-01-01T00:00:00.000Z' ? new Date(record.checkOut) : null,
+            status: record.status
+          });
+        });
+      }
+      
+      // Use any property that's unique to identify employees
+      // Here we use a combination of name and position if NIP is N/A
+      const key = employee.nip !== 'N/A' ? employee.nip : `${employee.fullName}-${employee.position}`;
+      
+      attendanceMap.set(key, {
+        name: employee.fullName,
+        position: employee.position,
+        attendance: attendanceByDate
+      });
+    });
+    
+    // Use the data directly from the API instead of the passed employees
+    // This ensures we're using all available employee data
+    employeesList = [];
+    let employeeId = 1;
+    
+    attendanceData.attendancesData.forEach(employee => {
+      // Include all employees, even those with NIP "N/A"
+      employeesList.push({
+        id: employeeId++,
+        name: employee.fullName,
+        // Only show NIP if it's not "N/A"
+        nip: employee.nip !== 'N/A' ? employee.nip : '',
+        position: employee.position,
+        // Store the lookup key for attendance data
+        lookupKey: employee.nip !== 'N/A' ? employee.nip : `${employee.fullName}-${employee.position}`
+      });
+    });
+  }
+  
+  console.log('Excel export - Total employees to display:', employeesList.length);
+  
+  // Sort employees by ID to ensure consistent order
+  employeesList.sort((a, b) => a.id - b.id);
+  
   // Populate data
   let rowIndex = headerRowNum + 1; // Starting row index after the header
   
-  employees.forEach((employee, empIndex) => {
+  employeesList.forEach((employee, empIndex) => {
     const timeLabels = ['Tiba', 'Paraf', 'Pulang', 'Paraf'];
     
     timeLabels.forEach((label, timeIndex) => {
@@ -180,17 +252,42 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
       // Add time label
       row.push(label);
       
-      // Add empty cells for each day of the month
+      // Add cells for each day of the month with attendance data if available
       for (let i = 0; i < daysInMonth.length; i++) {
-        row.push('');
+        const day = i + 1;
+        let cellValue = '';
+        
+        // Check if we have attendance data for this employee
+        const employeeData = attendanceMap.get(employee.lookupKey || employee.nip);
+        if (employeeData && employeeData.attendance.has(day)) {
+          const dayData = employeeData.attendance.get(day);
+          
+          // Handle different time labels
+          if (label === 'Tiba' && dayData.checkIn) {
+            cellValue = formatTime(dayData.checkIn);
+          } else if (label === 'Pulang' && dayData.checkOut) {
+            cellValue = formatTime(dayData.checkOut);
+          } else if (label === 'Paraf') {
+            // Add checkmark for paraf if corresponding time exists
+            if (timeIndex === 1 && dayData.checkIn) { // Paraf for arrival
+              cellValue = '✓';
+            } else if (timeIndex === 3 && dayData.checkOut) { // Paraf for departure
+              cellValue = '✓';
+            }
+          }
+          
+          // Display status in both Tiba and Pulang rows (timeIndex 0 and 2)
+          if ((timeIndex === 0 || timeIndex === 2) && ['Sick', 'Leave'].includes(dayData.status)) {
+            // Set status indicator for Sick or Leave
+            cellValue = dayData.status === 'Sick' ? 'S' : 'C';
+          }
+        }
+        
+        row.push(cellValue);
       }
       
-      // Add empty cell for Keterangan (only in first row)
-      if (timeIndex === 0) {
-        row.push('');
-      } else {
-        row.push('');
-      }
+      // Add empty cell for Keterangan
+      row.push('');
       
       worksheet.addRow(row);
       rowIndex++;
@@ -201,7 +298,7 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
       // Merge No column
       worksheet.mergeCells(`A${rowIndex - 4}:A${rowIndex - 1}`);
       
-      // Merge Name and NIP column
+      // Merge Name and NIP column - this remains the same
       worksheet.mergeCells(`B${rowIndex - 4}:B${rowIndex - 1}`);
       
       // Merge Position column
@@ -214,13 +311,16 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
       
       // Apply specific formatting to Name and NIP cell
       const nameCell = worksheet.getCell(`B${rowIndex - 4}`);
-      // Format content with rich text to keep name and NIP on separate lines
+      
+      // Use a single cell with properly formatted name and NIP
       nameCell.value = {
         richText: [
-          { text: employee.name + '\n', font: { size: 10 } },
+          { text: employee.name, font: { size: 10 } },
+          { text: '\n', font: { size: 10 } },
           { text: employee.nip, font: { size: 9 } }
         ]
       };
+      
       nameCell.alignment = { 
         vertical: 'middle', 
         horizontal: 'left',
@@ -228,6 +328,14 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
       };
     }
   });
+  
+  // Add legend for status codes at the bottom of the report
+  const legendRow = rowIndex + 2;
+  worksheet.getCell(`A${legendRow}`).value = 'Keterangan:';
+  worksheet.getCell(`A${legendRow}`).font = { bold: true };
+  
+  worksheet.getCell(`A${legendRow+1}`).value = 'S: Sakit';
+  worksheet.getCell(`A${legendRow+2}`).value = 'C: Cuti';
   
   // Apply borders to all cells in the table (starting from the header row)
   const borderStyle = { style: 'thin', color: { argb: 'FF000000' } };
@@ -297,6 +405,19 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
   
   // Clean up
   window.URL.revokeObjectURL(url);
+};
+
+// Helper function to format time as HH:MM
+const formatTime = (dateTime) => {
+  if (!dateTime) return '';
+  
+  const date = new Date(dateTime);
+  if (date.getTime() === 0) return '';
+  
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  
+  return `${hours}:${minutes}`;
 };
 
 // Helper function to get current date in Indonesian format
