@@ -4,8 +4,9 @@ import { useRouter } from 'next/navigation';
 import React, { useState, useEffect } from 'react';
 import { FaUserCircle, FaBell, FaSignOutAlt, FaSignInAlt, FaDoorOpen, FaClipboardList, FaHistory, FaClock, FaCalendarAlt, FaIdCard, FaCheckCircle } from 'react-icons/fa';
 import AttendanceService from '../api/attendance_service';
+import AuthWrapper from '@/components/AuthWrapper';
 
-export default function HomePage() {
+function HomePage() {
   // State for user data, loading, and error handling
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -239,5 +240,13 @@ export default function HomePage() {
         </button>
       </main>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <AuthWrapper>
+      <HomePage />
+    </AuthWrapper>
   );
 }

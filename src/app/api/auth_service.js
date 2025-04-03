@@ -1,3 +1,4 @@
+import { isValid } from "date-fns";
 import api from "./config/api";
 /**
    * Login user with email and password
@@ -35,7 +36,16 @@ const AuthService = {
         } catch (error) {
             return error.response.data;
         }
-    }
+    },
+
+    verifyToken: async (token) => {
+        try {
+            const response = await api.post('/auth/verify-token', { token });
+            return {isValid: true, ...response.data}
+        } catch (error) {
+            return {isValid: false, ...error.response.data}
+        }
+    },
 }
 
 export default AuthService;

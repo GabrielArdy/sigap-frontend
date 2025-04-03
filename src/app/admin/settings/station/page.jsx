@@ -5,8 +5,9 @@ import Swal from 'sweetalert2';
 import 'leaflet/dist/leaflet.css';
 import Link from 'next/link';
 import StationService from '@/app/api/station_service';
+import AuthWrapper from '@/components/AuthWrapper';
 
-export default function AnjunganPage() {
+function AnjunganPage() {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newAnjunganMode, setNewAnjunganMode] = useState(false);
@@ -525,5 +526,13 @@ export default function AnjunganPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AuthWrapper>
+      <AnjunganPage />
+    </AuthWrapper>
   );
 }

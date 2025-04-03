@@ -5,13 +5,14 @@ import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner, FaDoorOpen, FaMapMarkerAlt 
 import Swal from 'sweetalert2';
 import dynamic from 'next/dynamic';
 import AttendanceService from '../api/attendance_service';
+import AuthWrapper from '@/components/AuthWrapper';
 
 // Import QrCodeScanner with no SSR to avoid hydration issues
 const QrCodeScanner = dynamic(() => import('../../components/QrCodeScanner'), { 
   ssr: false 
 });
 
-export default function CheckoutPage() {
+function CheckoutPage() {
   const videoRef = useRef(null);
   const [hasPermission, setHasPermission] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -361,5 +362,13 @@ export default function CheckoutPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AuthWrapper>
+      <CheckoutPage />
+    </AuthWrapper>
   );
 }

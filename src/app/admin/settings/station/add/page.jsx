@@ -6,8 +6,9 @@ import 'leaflet/dist/leaflet.css';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StationService from '@/app/api/station_service';
+import AdminAuthWrapper from '@/components/AdminAuthWrapper';
 
-export default function AddAnjunganPage() {
+function AddAnjunganPage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -752,5 +753,13 @@ export default function AddAnjunganPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AdminAuthWrapper>
+      <AddAnjunganPage />
+    </AdminAuthWrapper>
   );
 }

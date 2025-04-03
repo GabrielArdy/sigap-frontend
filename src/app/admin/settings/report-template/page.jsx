@@ -3,8 +3,9 @@ import { useState, useRef, useEffect } from 'react';
 import { FiUser, FiMapPin, FiHome, FiFileText, FiCheck, FiUpload, FiPhone, FiHash, FiEdit } from 'react-icons/fi';
 import Swal from 'sweetalert2';
 import ReportInfo from '@/app/api/report_info';
+import AdminAuthWrapper from '@/components/AdminAuthWrapper';
 
-export default function TemplateUploadPage() {
+function TemplateUploadPage() {
   // Form state for text inputs
   const [schoolName, setSchoolName] = useState('');
   const [schoolAddress, setSchoolAddress] = useState('');
@@ -653,5 +654,13 @@ export default function TemplateUploadPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AdminAuthWrapper>
+      <TemplateUploadPage />
+    </AdminAuthWrapper>
   );
 }

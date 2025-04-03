@@ -4,8 +4,9 @@ import { useRouter } from 'next/navigation';
 import { FiSave, FiArrowLeft } from 'react-icons/fi';
 import Swal from 'sweetalert2';
 import AuthService from '../../../api/auth_service';
+import AdminAuthWrapper from '@/components/AdminAuthWrapper';
 
-export default function AddTeacherPage() {
+function AddTeacherPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -269,5 +270,13 @@ export default function AddTeacherPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AdminAuthWrapper>
+      <AddTeacherPage />
+    </AdminAuthWrapper>
   );
 }

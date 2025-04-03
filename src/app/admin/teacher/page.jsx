@@ -4,8 +4,9 @@ import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiFilter, FiRefreshCw, FiChevronLe
 import Swal from 'sweetalert2';
 import { useRouter } from 'next/navigation';
 import { getUsers, deleteUser } from '../../api/user_service';
+import AdminAuthWrapper from '@/components/AdminAuthWrapper';
 
-export default function DataGuruPage() {
+function DataGuruPage() {
   const router = useRouter();
   // State for teacher data
   const [teachers, setTeachers] = useState([]);
@@ -400,5 +401,13 @@ export default function DataGuruPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AdminAuthWrapper>
+      <DataGuruPage />
+    </AdminAuthWrapper>
   );
 }

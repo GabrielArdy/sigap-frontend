@@ -5,8 +5,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import AttendanceService from '../../api/attendance_service';
 import { format, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
+import AdminAuthWrapper from '@/components/AdminAuthWrapper';
 
-export default function DashboardPage() {
+function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
     totalUsers: 0,
@@ -278,5 +279,13 @@ export default function DashboardPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <AdminAuthWrapper>
+      <DashboardPage />
+    </AdminAuthWrapper>
   );
 }

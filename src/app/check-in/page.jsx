@@ -5,6 +5,7 @@ import { FaArrowLeft, FaQrcode, FaCamera, FaSpinner, FaMapMarkerAlt } from 'reac
 import Swal from 'sweetalert2';
 import dynamic from 'next/dynamic';
 import AttendanceService from '../api/attendance_service';
+import AuthWrapper from '@/components/AuthWrapper';
 
 // Dynamically import the QrCodeScanner component with no SSR
 const QrCodeScanner = dynamic(
@@ -12,7 +13,7 @@ const QrCodeScanner = dynamic(
   { ssr: false }
 );
 
-export default function ScanPage() {
+function ScanPage() {
   const [hasPermission, setHasPermission] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
@@ -352,5 +353,13 @@ export default function ScanPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AuthWrapper>
+      <ScanPage />
+    </AuthWrapper>
   );
 }

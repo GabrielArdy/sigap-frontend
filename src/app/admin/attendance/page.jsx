@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { FiSearch, FiEdit2, FiFilter, FiRefreshCw, FiCalendar } from 'react-icons/fi';
 import Swal from 'sweetalert2';
 import AttendanceService from '@/app/api/attendance_service';
+import AdminAuthWrapper from '@/components/AdminAuthWrapper';
 
-export default function AttendancePage() {
+function AttendancePage() {
   const [attendanceData, setAttendanceData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [selectedStaff, setSelectedStaff] = useState('');
@@ -500,5 +501,13 @@ export default function AttendancePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AdminAuthWrapper>
+      <AttendancePage />
+    </AdminAuthWrapper>
   );
 }

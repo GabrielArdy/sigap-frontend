@@ -17,11 +17,14 @@ const ReportInfo = {
             return error.response.data;
         }
     },
-    getReportData : async () => {
+    getReportData : async (month, year) => {
         try {
-            const currentDate = new Date();
-            const month = currentDate.getMonth() + 1;
-            const year = currentDate.getFullYear();
+            if (!month || !year) {
+                const currentDate = new Date();
+                month = currentDate.getMonth() + 1; // Months are 0-indexed
+                year = currentDate.getFullYear();
+            }
+
             const response = await api.get(`/admin/report?month=${month}&year=${year}`);
             
             // No need for complex transformations, just return the data as-is

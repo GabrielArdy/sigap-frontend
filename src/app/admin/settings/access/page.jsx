@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { FiSearch, FiPlus, FiEdit2, FiSave, FiX, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import Swal from 'sweetalert2';
 import { getAllAdminAccessData, updateAdminAccessData } from '@/app/api/user_service';
+import AdminAuthWrapper from '@/components/AdminAuthWrapper';
 
-export default function AdminAccessPage() {
+function AdminAccessPage() {
   // State for users data and pagination
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -455,5 +456,13 @@ export default function AdminAccessPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AdminAuthWrapper>
+        <AdminAccessPage />
+    </AdminAuthWrapper>
   );
 }

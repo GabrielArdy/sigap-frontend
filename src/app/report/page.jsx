@@ -5,8 +5,9 @@ import { FaArrowLeft, FaDownload, FaCalendarAlt, FaUser } from 'react-icons/fa';
 import AttendanceService from '../api/attendance_service';
 import ReportInfo from '../api/report_info';
 import { exportAttendanceToExcel } from '@/utils/excelExport';
+import AuthWrapper from '@/components/AuthWrapper';
 
-export default function AttendanceReportPage() {
+function AttendanceReportPage() {
   const [selectedMonth, setSelectedMonth] = useState('');
   const [userData, setUserData] = useState(null);
   const [attendanceData, setAttendanceData] = useState([]);
@@ -33,8 +34,11 @@ export default function AttendanceReportPage() {
 
   useEffect(() => {
     const fetchAttendanceData = async () => {
+      if (!selectedMonth) return;
+      
       try {
-        const response = await ReportInfo.getReportData();
+        const [year, month] = selectedMonth.split('-');
+        const response = await ReportInfo.getReportData(parseInt(month), parseInt(year));
         if (response.success && response.data) {
           setAttendanceReportData(response.data);
         }
@@ -44,7 +48,7 @@ export default function AttendanceReportPage() {
     };
     
     fetchAttendanceData();
-  }, []);
+  }, [selectedMonth]);
 
   // Generate last 6 months for selection
   const months = Array.from({ length: 6 }, (_, i) => {
@@ -393,5 +397,13 @@ export default function AttendanceReportPage() {
         </button>
       </main>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AuthWrapper>
+      <AttendanceReportPage />
+    </AuthWrapper>
   );
 }

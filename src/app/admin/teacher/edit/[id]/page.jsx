@@ -4,8 +4,9 @@ import { useRouter } from 'next/navigation';
 import { FiSave, FiArrowLeft } from 'react-icons/fi';
 import Swal from 'sweetalert2';
 import { getUserById, updateUser } from '../../../../api/user_service';
+import AdminAuthWrapper from '@/components/AdminAuthWrapper';
 
-export default function EditTeacherPage({ params }) {
+function EditTeacherPage({ params }) {
   const router = useRouter();
   const { id } = use(params);
   
@@ -255,5 +256,13 @@ export default function EditTeacherPage({ params }) {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function Page({ params }) {
+  return (
+    <AdminAuthWrapper>
+      <EditTeacherPage params={params} />
+    </AdminAuthWrapper>
   );
 }
