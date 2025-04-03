@@ -273,7 +273,7 @@ function HomePage() {
           <div className="bg-white/20 p-2.5 rounded-lg mr-3">
             <FaCalendarAlt className="text-white text-lg" />
           </div>
-          <span className="font-medium">Ajukan Izin</span>
+          <span className="font-medium">Lakukan Pengajuan Izin</span>
         </button>
       </main>
     </div>
