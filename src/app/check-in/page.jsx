@@ -221,7 +221,7 @@ function ScanPage() {
     console.debug("QR scan attempt failed", error);
   };
 
-  // Process QR code data and send to API - simplified success handling
+  // Process QR code data and send to API
   const processAttendance = async (qrData) => {
     try {
       setScanMessage('Memproses absensi...');
@@ -272,23 +272,58 @@ function ScanPage() {
       const response = await AttendanceService.recordCheckInTime(attendanceData);
       
       if (response.success) {
-        // Update scan result without showing popup
+        // Update scan result
         setScanResult(response.data);
         
-        // Show non-popup success message
-        setScanMessage('Absensi Berhasil!');
+        // Format current time
+        const currentTime = new Date().toLocaleTimeString('id-ID', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        });
         
-        // Redirect after short delay
-        setTimeout(() => {
+        // Show success message with SweetAlert - simplified information
+        Swal.fire({
+          icon: 'success',
+          title: 'Absensi Berhasil',
+          html: `
+            <div class="text-left">
+              <p><strong>Nama:</strong> ${userFullName}</p>
+              <p><strong>Anjungan:</strong> ${parsedQrData.stationId || 'Terminal'}</p>
+              <p><strong>Waktu:</strong> ${currentTime}</p>
+            </div>
+          `,
+          confirmButtonText: 'Kembali ke Beranda',
+          confirmButtonColor: '#3549b1',
+          timer: 3000, // Auto close after 3 seconds
+          timerProgressBar: true
+        }).then((result) => {
+          // Redirect whether the user clicked the button or the timer expired
           window.location.href = '/home';
-        }, 1500);
+        });
       } else {
-        // Show error message without popup
-        handleScanFailed(response.message || 'Gagal melakukan absensi', false);
+        // Show error message
+        Swal.fire({
+          icon: 'error',
+          title: 'Absensi Gagal',
+          text: response.message || 'Gagal melakukan absensi',
+          confirmButtonColor: '#3549b1',
+        }).then(() => {
+          setIsScanning(false);
+          setScanMessage('QR Code tidak valid atau terjadi kesalahan.');
+        });
       }
     } catch (error) {
       console.error('Error processing attendance:', error);
-      handleScanFailed('Format QR Code tidak valid atau terjadi kesalahan saat memproses', false);
+      
+      Swal.fire({
+        icon: 'error',
+        title: 'Format QR Tidak Valid',
+        text: 'Format QR Code tidak valid atau terjadi kesalahan saat memproses',
+        confirmButtonColor: '#3549b1',
+      }).then(() => {
+        setIsScanning(false);
+        setScanMessage('QR Code tidak valid atau terjadi kesalahan.');
+      });
     }
   };
   
@@ -351,16 +386,24 @@ function ScanPage() {
     }
   };
 
-  // Handle scan failure - updated to avoid popup
+  // Handle scan failure - updated to use SweetAlert
   const handleScanFailed = (message, showRetryOption = true) => {
     setIsScanning(false);
-    setScanMessage(message || 'QR Code tidak valid atau terjadi kesalahan.');
     
     if (showRetryOption) {
-      // Add a retry button instead of popup
-      setTimeout(() => {
-        prepareScanning();
-      }, 2000);
+      Swal.fire({
+        icon: 'error',
+        title: 'Scan Gagal',
+        text: message || 'QR Code tidak valid atau terjadi kesalahan.',
+        confirmButtonColor: '#3549b1',
+        confirmButtonText: 'Coba Lagi',
+      }).then((result) => {
+        if (result.isConfirmed) {
+          prepareScanning();
+        }
+      });
+    } else {
+      setScanMessage(message || 'QR Code tidak valid atau terjadi kesalahan.');
     }
   };
 
@@ -372,7 +415,7 @@ function ScanPage() {
           <Link href="/home" className="text-white p-2 hover:bg-white/20 rounded-full transition-colors duration-200">
             <FaArrowLeft size={18} />
           </Link>
-          <h1 className="text-xl font-bold">Scan QR Code</h1>
+          <h1 className="text-xl font-bold">Absen Masuk</h1>
         </div>
         <FaQrcode size={24} />
       </header>

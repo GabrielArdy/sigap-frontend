@@ -163,51 +163,51 @@ function HomePage() {
 
             {/* Today's Attendance Card - Redesigned with repositioned date */}
             <div className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 border border-sky-100">
-              <div className="bg-gradient-to-r from-sky-100 to-sky-50 p-4">
+              <div className="bg-gradient-to-r from-sky-100 to-sky-50 p-2.5">
                 <div className="flex items-center">
-                  <FaHistory className="text-blue-500 mr-2 text-lg" />
-                  <h3 className="text-lg font-bold text-slate-700">Kehadiran Hari Ini</h3>
+                  <FaHistory className="text-blue-500 mr-2 text-base" />
+                  <h3 className="text-base font-bold text-slate-700">Kehadiran Hari Ini</h3>
                 </div>
               </div>
               
-              <div className="px-5 pt-3 pb-2 border-b border-sky-50">
-                <div className="flex items-center text-sm text-slate-600">
-                  <FaCalendarAlt className="text-blue-500 mr-2" />
+              <div className="px-3 pt-1.5 pb-0.5 border-b border-sky-50">
+                <div className="flex items-center text-xs text-slate-600">
+                  <FaCalendarAlt className="text-blue-500 mr-1.5" />
                   <span className="font-medium">{displayData.todayAttendance.date}</span>
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
                 <div className={`
-                  bg-slate-50 p-4 rounded-xl border border-sky-100 relative overflow-hidden 
+                  bg-slate-50 p-2.5 rounded-xl border border-sky-100 relative overflow-hidden 
                   group hover:shadow-md transition-all duration-300 hover:bg-white
                   ${displayData.todayAttendance.checkIn !== "-" ? "border-l-4 border-l-green-500" : "border-l-4 border-l-slate-300"}
                 `}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div className={`rounded-full ${displayData.todayAttendance.checkIn !== "-" ? "bg-green-100" : "bg-slate-100"} p-2.5`}>
-                      <FaSignInAlt className={`text-lg ${displayData.todayAttendance.checkIn !== "-" ? "text-green-600" : "text-slate-400"}`} />
+                  <div className="flex justify-between items-start mb-0.5">
+                    <div className={`rounded-full ${displayData.todayAttendance.checkIn !== "-" ? "bg-green-100" : "bg-slate-100"} p-1.5`}>
+                      <FaSignInAlt className={`text-base ${displayData.todayAttendance.checkIn !== "-" ? "text-green-600" : "text-slate-400"}`} />
                     </div>
-                    <FaClock className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                    <FaClock className="text-slate-400 text-sm group-hover:text-blue-500 transition-colors" />
                   </div>
-                  <p className="text-xs text-slate-500 mb-1 mt-1">Jam Masuk</p>
-                  <p className={`text-xl font-semibold ${displayData.todayAttendance.checkIn !== "-" ? "text-blue-600" : "text-slate-400"}`}>
+                  <p className="text-xs text-slate-500 mt-1">Jam Masuk</p>
+                  <p className={`text-base font-semibold ${displayData.todayAttendance.checkIn !== "-" ? "text-blue-600" : "text-slate-400"}`}>
                     {displayData.todayAttendance.checkIn}
                   </p>
                 </div>
                 
                 <div className={`
-                  bg-slate-50 p-4 rounded-xl border border-sky-100 relative overflow-hidden 
+                  bg-slate-50 p-2.5 rounded-xl border border-sky-100 relative overflow-hidden 
                   group hover:shadow-md transition-all duration-300 hover:bg-white
                   ${displayData.todayAttendance.checkOut !== "-" ? "border-l-4 border-l-blue-500" : "border-l-4 border-l-slate-300"}
                 `}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div className={`rounded-full ${displayData.todayAttendance.checkOut !== "-" ? "bg-blue-100" : "bg-slate-100"} p-2.5`}>
-                      <FaDoorOpen className={`text-lg ${displayData.todayAttendance.checkOut !== "-" ? "text-blue-600" : "text-slate-400"}`} />
+                  <div className="flex justify-between items-start mb-0.5">
+                    <div className={`rounded-full ${displayData.todayAttendance.checkOut !== "-" ? "bg-blue-100" : "bg-slate-100"} p-1.5`}>
+                      <FaDoorOpen className={`text-base ${displayData.todayAttendance.checkOut !== "-" ? "text-blue-600" : "text-slate-400"}`} />
                     </div>
-                    <FaClock className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                    <FaClock className="text-slate-400 text-sm group-hover:text-blue-500 transition-colors" />
                   </div>
-                  <p className="text-xs text-slate-500 mb-1 mt-1">Jam Keluar</p>
-                  <p className={`text-xl font-semibold ${displayData.todayAttendance.checkOut !== "-" ? "text-blue-600" : "text-slate-400"}`}>
+                  <p className="text-xs text-slate-500 mt-1">Jam Keluar</p>
+                  <p className={`text-base font-semibold ${displayData.todayAttendance.checkOut !== "-" ? "text-blue-600" : "text-slate-400"}`}>
                     {displayData.todayAttendance.checkOut}
                   </p>
                 </div>
@@ -217,24 +217,24 @@ function HomePage() {
         )}
 
         {/* Attendance Actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-2">
+        <div className="grid grid-cols-2 gap-4 mt-2">
           <button 
             onClick={handleCheckIn}
             className={`
               flex flex-col items-center justify-center 
               bg-white
               hover:bg-blue-50
-              p-5 rounded-xl shadow-md transition-all duration-300
+              p-4 rounded-xl shadow-md transition-all duration-300
               min-h-[110px] border-2 border-blue-300
               ${checkInActive ? 'transform scale-95 bg-blue-50' : 'hover:transform hover:scale-[1.02]'}
             `}
             aria-label="Check In Button"
           >
-            <div className="bg-green-100 p-3 rounded-full shadow-sm mb-3 border border-green-200">
-              <FaSignInAlt className="text-green-600 text-2xl" />
+            <div className="bg-green-100 p-2.5 rounded-full shadow-sm mb-2 border border-green-200">
+              <FaSignInAlt className="text-green-600 text-xl" />
             </div>
             <span className="font-bold text-base text-slate-800">Masuk</span>
-            <span className="text-sm text-slate-600 mt-1">Rekam Kehadiran</span>
+            <span className="text-xs text-slate-600 mt-1">Rekam Kehadiran</span>
           </button>
           
           <button 
@@ -243,17 +243,17 @@ function HomePage() {
               flex flex-col items-center justify-center 
               bg-white
               hover:bg-blue-50
-              p-5 rounded-xl shadow-md transition-all duration-300
+              p-4 rounded-xl shadow-md transition-all duration-300
               min-h-[110px] border-2 border-blue-300
               ${checkOutActive ? 'transform scale-95 bg-blue-50' : 'hover:transform hover:scale-[1.02]'}
             `}
             aria-label="Check Out Button"
           >
-            <div className="bg-blue-100 p-3 rounded-full shadow-sm mb-3 border border-blue-200">
-              <FaDoorOpen className="text-blue-600 text-2xl" />
+            <div className="bg-blue-100 p-2.5 rounded-full shadow-sm mb-2 border border-blue-200">
+              <FaDoorOpen className="text-blue-600 text-xl" />
             </div>
             <span className="font-bold text-base text-slate-800">Keluar</span>
-            <span className="text-sm text-slate-600 mt-1">Rekam Pulang</span>
+            <span className="text-xs text-slate-600 mt-1">Rekam Pulang</span>
           </button>
         </div>
 
@@ -269,7 +269,7 @@ function HomePage() {
         {/* Leave Request Button */}
         <button 
           onClick={() => router.push('/leave-request')}
-          className="mt-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white py-4 px-6 rounded-xl shadow-md transition-all flex items-center justify-center transform hover:translate-y-[-2px] hover:shadow-lg active:translate-y-0 duration-300">
+          className="mt-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white py-4 px-6 rounded-xl shadow-md transition-all flex items-center justify-center transform hover:translate-y-[-2px] hover:shadow-lg active:translate-y-0 duration-300">
           <div className="bg-white/20 p-2.5 rounded-lg mr-3">
             <FaCalendarAlt className="text-white text-lg" />
           </div>

@@ -23,7 +23,7 @@ function CheckoutPage() {
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [locationError, setLocationError] = useState(null);
   
-  // Show success alert - simplified similar to check-in page
+  // Show success alert - simplified to show only essential information
   const showSuccessAlert = (result) => {
     const userFullName = getUserName();
     
@@ -33,8 +33,7 @@ function CheckoutPage() {
       html: `
         <div class="text-left">
           <p><strong>Nama:</strong> ${userFullName}</p>
-          <p><strong>Lokasi:</strong> ${result.location || 'Terdeteksi'}</p>
-          <p><strong>Terminal:</strong> ${result.terminal}</p>
+          <p><strong>Anjungan:</strong> ${result.terminal}</p>
           <p><strong>Waktu:</strong> ${new Date(result.timestamp).toLocaleTimeString('id-ID')}</p>
         </div>
       `,
@@ -252,7 +251,7 @@ function CheckoutPage() {
           <Link href="/home" className="text-white p-2 hover:bg-white/20 rounded-full transition-colors duration-200">
             <FaArrowLeft size={18} />
           </Link>
-          <h1 className="text-xl font-bold">Scan QR Absen Pulang</h1>
+          <h1 className="text-xl font-bold">Absen Pulang</h1>
         </div>
         <FaDoorOpen size={24} />
       </header>

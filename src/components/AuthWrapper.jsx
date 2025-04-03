@@ -45,8 +45,13 @@ export default function AuthWrapper({ children }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="flex items-center justify-center min-h-screen bg-sky-100">
+        <div className="relative">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-sky-500 border-t-transparent"></div>
+          <div className="absolute top-0 left-0 h-16 w-16 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-full bg-sky-400 opacity-70"></div>
+          </div>
+        </div>
       </div>
     );
   }
