@@ -23,7 +23,7 @@ function ScanPage() {
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [locationError, setLocationError] = useState(null);
   const [locationPermission, setLocationPermission] = useState('prompt'); // 'prompt', 'granted', 'denied'
-  
+
   // Get user ID from local storage on component mount
   useEffect(() => {
     try {
@@ -58,18 +58,65 @@ function ScanPage() {
           return;
         }
         
-        // Check if we can query permissions via Permissions API
-        if (navigator.permissions && navigator.permissions.query) {
-          const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
-          setLocationPermission(permissionStatus.state);
+        // Try to request location first as a more reliable way to check permission
+        try {
+          // Set a short timeout to quickly test if location is accessible
+          const quickLocationTest = await new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => reject(new Error('timeout')), 2000);
+            
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                clearTimeout(timeoutId);
+                resolve(position);
+              },
+              (error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+              },
+              { timeout: 1500, maximumAge: 60000 }
+            );
+          });
           
-          // Listen for permission changes
-          permissionStatus.onchange = () => {
-            setLocationPermission(permissionStatus.state);
-            if (permissionStatus.state === 'granted') {
-              setLocationError(null);
-            }
+          // If we got here, permission is granted
+          setLocationPermission('granted');
+          
+          // Also update the location data
+          const location = {
+            latitude: quickLocationTest.coords.latitude,
+            longitude: quickLocationTest.coords.longitude,
+            accuracy: quickLocationTest.coords.accuracy
           };
+          setLocationData(location);
+          setLocationError(null);
+          return;
+        } catch (error) {
+          // If it's a timeout, don't assume permission is denied
+          if (error.message === 'timeout') {
+            // Keep permission as 'prompt' and try again later
+          } 
+          // If error is PERMISSION_DENIED, then we know it's denied
+          else if (error.code === 1) { // 1 is PERMISSION_DENIED
+            setLocationPermission('denied');
+          }
+        }
+        
+        // Fallback to Permissions API if available
+        if (navigator.permissions && navigator.permissions.query) {
+          try {
+            const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+            setLocationPermission(permissionStatus.state);
+            
+            // Listen for permission changes
+            permissionStatus.onchange = () => {
+              setLocationPermission(permissionStatus.state);
+              if (permissionStatus.state === 'granted') {
+                setLocationError(null);
+                getCurrentLocation().catch(console.error);
+              }
+            };
+          } catch (permError) {
+            console.error('Error querying permission status:', permError);
+          }
         }
       } catch (error) {
         console.error('Error checking location permission:', error);
@@ -110,7 +157,7 @@ function ScanPage() {
           };
           setLocationData(location);
           setLocationError(null);
-          setLocationPermission('granted');
+          setLocationPermission('granted'); // Important: update permission state based on success
           setIsLoadingLocation(false);
           resolve(location);
         },
@@ -146,38 +193,13 @@ function ScanPage() {
     });
   };
   
-  // Request location permission explicitly with UI feedback
+  // Request location permission explicitly with UI feedback - simplified without popup
   const requestLocationPermission = async () => {
     try {
-      setScanMessage('Meminta izin lokasi...');
-      
-      // Show a custom dialog first to prepare the user
-      const result = await Swal.fire({
-        title: 'Izin Lokasi Diperlukan',
-        html: `
-          <div class="text-left">
-            <p>Untuk melakukan absensi, aplikasi memerlukan akses lokasi Anda.</p>
-            <p class="mt-2">Pastikan:</p>
-            <ul class="list-disc pl-5 mt-1">
-              <li>GPS perangkat Anda aktif</li>
-              <li>Anda mengizinkan akses lokasi untuk aplikasi ini</li>
-            </ul>
-          </div>
-        `,
-        icon: 'info',
-        showCancelButton: true,
-        confirmButtonText: 'Izinkan Akses Lokasi',
-        cancelButtonText: 'Batal',
-        confirmButtonColor: '#3549b1',
-      });
-      
-      if (result.isConfirmed) {
-        await getCurrentLocation();
-        return true;
-      } else {
-        setScanMessage('Akses lokasi diperlukan untuk melanjutkan');
-        return false;
-      }
+      setScanMessage('Mengakses lokasi...');
+      // Try to get location directly without showing a popup first
+      await getCurrentLocation();
+      return true;
     } catch (error) {
       console.error('Error requesting location permission:', error);
       return false;
@@ -199,7 +221,7 @@ function ScanPage() {
     console.debug("QR scan attempt failed", error);
   };
 
-  // Process QR code data and send to API
+  // Process QR code data and send to API - simplified success handling
   const processAttendance = async (qrData) => {
     try {
       setScanMessage('Memproses absensi...');
@@ -250,34 +272,23 @@ function ScanPage() {
       const response = await AttendanceService.recordCheckInTime(attendanceData);
       
       if (response.success) {
-        // Show success message with SweetAlert
-        Swal.fire({
-          icon: 'success',
-          title: 'Absensi Berhasil',
-          html: `
-            <div class="text-left">
-              <p><strong>Nama:</strong> ${userFullName}</p>
-              <p><strong>Lokasi:</strong> ${response.data?.location || 'Terdeteksi'}</p>
-              <p><strong>Terminal:</strong> ${parsedQrData.stationId}</p>
-              <p><strong>Waktu:</strong> ${new Date().toLocaleTimeString('id-ID')}</p>
-            </div>
-          `,
-          confirmButtonText: 'Kembali ke Beranda',
-          confirmButtonColor: '#3549b1',
-        }).then((result) => {
-          if (result.isConfirmed) {
-            window.location.href = '/home';
-          }
-        });
-        
+        // Update scan result without showing popup
         setScanResult(response.data);
+        
+        // Show non-popup success message
+        setScanMessage('Absensi Berhasil!');
+        
+        // Redirect after short delay
+        setTimeout(() => {
+          window.location.href = '/home';
+        }, 1500);
       } else {
-        // Show error message
-        handleScanFailed(response.message || 'Gagal melakukan absensi');
+        // Show error message without popup
+        handleScanFailed(response.message || 'Gagal melakukan absensi', false);
       }
     } catch (error) {
       console.error('Error processing attendance:', error);
-      handleScanFailed('Format QR Code tidak valid atau terjadi kesalahan saat memproses');
+      handleScanFailed('Format QR Code tidak valid atau terjadi kesalahan saat memproses', false);
     }
   };
   
@@ -287,83 +298,70 @@ function ScanPage() {
       // First check/request location permission
       setScanMessage('Memeriksa izin lokasi...');
       
-      if (locationPermission === 'denied') {
-        // If permission already denied, show instructions to enable
-        Swal.fire({
-          icon: 'warning',
-          title: 'Akses Lokasi Diblokir',
-          html: `
-            <div class="text-left">
-              <p>Akses lokasi diblokir oleh browser Anda.</p>
-              <p class="mt-2">Cara mengaktifkan:</p>
-              <ol class="list-decimal pl-5 mt-1">
-                <li>Klik ikon kunci/info di address bar</li>
-                <li>Pilih "Izin Situs" atau "Pengaturan Situs"</li>
-                <li>Aktifkan izin lokasi</li>
-                <li>Muat ulang halaman</li>
-              </ol>
-            </div>
-          `,
-          confirmButtonText: 'Muat Ulang Halaman',
-          confirmButtonColor: '#3549b1',
-          showCancelButton: true,
-          cancelButtonText: 'Batal',
-        }).then((result) => {
-          if (result.isConfirmed) {
-            window.location.reload();
-          }
-        });
-        return;
-      }
-      
-      // Request location permission if not already granted
-      if (locationPermission !== 'granted') {
-        const permissionGranted = await requestLocationPermission();
-        if (!permissionGranted) return;
-      } else {
-        // Get location if permission is already granted
-        setScanMessage('Mendapatkan lokasi...');
-        await getCurrentLocation();
-      }
-      
-      // Then start camera if location was successfully retrieved
+      // If we already have location data, we can skip requesting again
       if (locationData) {
         setIsScanning(true);
         setHasPermission(true);
         setScanMessage('Posisikan QR Code dalam bingkai');
-      } else {
-        // If still no location data, show error
-        throw new Error('Tidak dapat mendapatkan lokasi');
+        return;
+      }
+      
+      // Try to get location directly first without popup dialogs
+      try {
+        setScanMessage('Mendapatkan lokasi...');
+        await getCurrentLocation();
+        
+        // If we got here, we have location data and permission is granted
+        setIsScanning(true);
+        setHasPermission(true);
+        setScanMessage('Posisikan QR Code dalam bingkai');
+        return;
+      } catch (locationError) {
+        // If error is permission denied, try one more time
+        if (locationError.code === 1) { // 1 is PERMISSION_DENIED
+          // Try again without confirmation dialog
+          setScanMessage('Mencoba akses lokasi kembali...');
+          try {
+            await getCurrentLocation();
+            setIsScanning(true);
+            setHasPermission(true);
+            setScanMessage('Posisikan QR Code dalam bingkai');
+            return;
+          } catch (secondError) {
+            // Display error in location indicator instead of popup
+            setLocationError('Akses lokasi ditolak. Mohon aktifkan GPS dan izinkan akses lokasi.');
+            throw new Error('Masih tidak dapat mengakses lokasi');
+          }
+        } else {
+          // Display error in location indicator instead of popup
+          throw locationError;
+        }
       }
     } catch (error) {
       console.error('Error preparing scan:', error);
       
-      Swal.fire({
-        icon: 'error',
-        title: 'Akses Lokasi Gagal',
-        text: locationError || 'Tidak dapat mengakses lokasi. Pastikan GPS aktif dan Anda memberikan izin lokasi.',
-        confirmButtonColor: '#3549b1',
-      });
+      // Instead of showing a popup, just update the location error message
+      // and the status message
+      if (!locationError) {
+        setLocationError('Tidak dapat mengakses lokasi. Pastikan GPS aktif dan izin lokasi diberikan.');
+      }
       
       setScanMessage('Gagal mendapatkan lokasi');
       setIsScanning(false);
     }
   };
-  
-  // Handle scan failure
-  const handleScanFailed = (message) => {
+
+  // Handle scan failure - updated to avoid popup
+  const handleScanFailed = (message, showRetryOption = true) => {
     setIsScanning(false);
-    Swal.fire({
-      icon: 'error',
-      title: 'Scan Gagal',
-      text: message || 'QR Code tidak valid atau terjadi kesalahan saat memproses.',
-      confirmButtonColor: '#3549b1',
-      confirmButtonText: 'Coba Lagi',
-    }).then((result) => {
-      if (result.isConfirmed) {
+    setScanMessage(message || 'QR Code tidak valid atau terjadi kesalahan.');
+    
+    if (showRetryOption) {
+      // Add a retry button instead of popup
+      setTimeout(() => {
         prepareScanning();
-      }
-    });
+      }, 2000);
+    }
   };
 
   return (
