@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { FiMenu, FiChevronDown, FiChevronRight, FiLogOut, FiUser, FiSettings, FiUsers, FiCalendar, FiHome, FiMonitor } from 'react-icons/fi';
+import { FiMenu, FiChevronDown, FiChevronRight, FiLogOut, FiUser, FiSettings, FiUsers, FiCalendar, FiHome, FiMonitor, FiFileText } from 'react-icons/fi';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
+import { icon } from 'leaflet';
 
 
 
@@ -120,6 +121,11 @@ export default function DashboardLayout({ children }) {
       name: 'Data Kehadiran',
       icon: <FiCalendar className="w-5 h-5" />,
       path: '/admin/attendance',
+    },
+    {
+      name: 'Data Pengajuan',
+      icon: <FiFileText className="w-5 h-5" />,
+      path: '/admin/leave-request',
     },
     {
       name: 'Pengaturan',
