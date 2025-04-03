@@ -543,7 +543,7 @@ function TemplateUploadPage() {
           {/* Tut Wuri Logo */}
           <div>
             <label htmlFor="tutWuriLogo" className="block text-sm font-medium text-gray-700 mb-1">
-              Logo Tut Wuri <span className="text-red-500">*</span>
+              Logo Dinas <span className="text-red-500">*</span>
             </label>
             <div className="mt-1 flex items-center space-x-4">
               {(isEditing || !dataExists) && (

@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 
 
+
 export default function DashboardLayout({ children }) {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -155,7 +156,7 @@ export default function DashboardLayout({ children }) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Navbar */}
-      <header className="fixed top-0 left-0 right-0 z-30 bg-white shadow-sm h-16">
+      <header className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm h-16">
         <div className="h-full px-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
@@ -176,7 +177,7 @@ export default function DashboardLayout({ children }) {
               onClick={() => setProfileDropdownOpen(!isProfileDropdownOpen)}
               className="flex items-center space-x-3 group focus:outline-none"
             >
-              <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600">{getFullName()}</span>
+              <span className="hidden md:inline text-sm font-medium text-gray-700 group-hover:text-blue-600">{getFullName()}</span>
               <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white uppercase">
                 {getUserInitials()}
               </div>
@@ -205,11 +206,20 @@ export default function DashboardLayout({ children }) {
         </div>
       </header>
 
+      {/* Overlay for mobile when sidebar is open */}
+      {isMobile && isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        ></div>
+      )}
+
       {/* Sidebar */}
       <aside 
-        className={`fixed left-0 top-0 bottom-0 z-20 pt-16 flex flex-col w-64 transition-all duration-300 ease-in-out bg-white border-r border-gray-200 sidebar ${
+        className={`fixed left-0 top-0 bottom-0 z-35 pt-16 flex flex-col w-64 transition-transform duration-300 ease-in-out bg-white border-r border-gray-200 sidebar ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } ${isMobile ? 'shadow-lg' : ''}`}
       >
         <div className="flex-1 overflow-y-auto px-3 py-4">
           <nav className="space-y-1">
@@ -247,6 +257,7 @@ export default function DashboardLayout({ children }) {
                                 ? 'bg-blue-50 text-blue-600'
                                 : 'text-gray-600 hover:bg-gray-100'
                             }`}
+                            onClick={() => isMobile && setSidebarOpen(false)}
                           >
                             <span className="w-1.5 h-1.5 mr-3 bg-gray-300 rounded-full"></span>
                             {child.name}
@@ -263,6 +274,7 @@ export default function DashboardLayout({ children }) {
                         ? 'bg-blue-50 text-blue-600'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
+                    onClick={() => isMobile && setSidebarOpen(false)}
                   >
                     <span className="mr-3">{item.icon}</span>
                     {item.name}
@@ -290,21 +302,13 @@ export default function DashboardLayout({ children }) {
         </div>
       </aside>
 
-      {/* Overlay for mobile when sidebar is open */}
-      {isMobile && isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-10"
-          onClick={() => setSidebarOpen(false)}
-        ></div>
-      )}
-
       {/* Main content */}
       <main 
         className={`flex-1 transition-all duration-300 ease-in-out pt-16 ${
-          isSidebarOpen ? 'md:ml-64' : ''
+          isSidebarOpen && !isMobile ? 'md:ml-64' : ''
         }`}
       >
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {children}
         </div>
       </main>
