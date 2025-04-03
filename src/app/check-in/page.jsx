@@ -21,6 +21,8 @@ function ScanPage() {
   const [userId, setUserId] = useState(null);
   const [locationData, setLocationData] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [locationError, setLocationError] = useState(null);
+  const [locationPermission, setLocationPermission] = useState('prompt'); // 'prompt', 'granted', 'denied'
   
   // Get user ID from local storage on component mount
   useEffect(() => {
@@ -46,37 +48,140 @@ function ScanPage() {
     }
   }, []);
   
-  // Get current location
+  // Check geolocation permissions
+  useEffect(() => {
+    const checkLocationPermission = async () => {
+      try {
+        // Check if geolocation is supported
+        if (!navigator.geolocation) {
+          setLocationPermission('unsupported');
+          return;
+        }
+        
+        // Check if we can query permissions via Permissions API
+        if (navigator.permissions && navigator.permissions.query) {
+          const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+          setLocationPermission(permissionStatus.state);
+          
+          // Listen for permission changes
+          permissionStatus.onchange = () => {
+            setLocationPermission(permissionStatus.state);
+            if (permissionStatus.state === 'granted') {
+              setLocationError(null);
+            }
+          };
+        }
+      } catch (error) {
+        console.error('Error checking location permission:', error);
+      }
+    };
+    
+    checkLocationPermission();
+  }, []);
+  
+  // Get current location with enhanced error handling
   const getCurrentLocation = () => {
     return new Promise((resolve, reject) => {
       setIsLoadingLocation(true);
+      setLocationError(null);
+      
       if (!navigator.geolocation) {
+        const error = new Error('Geolocation is not supported by your browser');
+        setLocationError('Geolokasi tidak didukung oleh browser Anda');
         setIsLoadingLocation(false);
-        reject(new Error('Geolocation is not supported by your browser'));
-      } else {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const location = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude
-            };
-            setLocationData(location);
-            setIsLoadingLocation(false);
-            resolve(location);
-          },
-          (error) => {
-            console.error('Geolocation error:', error);
-            setIsLoadingLocation(false);
-            reject(error);
-          },
-          { 
-            enableHighAccuracy: true, 
-            timeout: 10000, 
-            maximumAge: 0 
-          }
-        );
+        reject(error);
+        return;
       }
+      
+      // Create a timeout for geolocation request
+      const timeoutId = setTimeout(() => {
+        setLocationError('Permintaan lokasi timeout. Coba lagi.');
+        setIsLoadingLocation(false);
+        reject(new Error('Geolocation timeout'));
+      }, 15000); // 15 seconds timeout
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          clearTimeout(timeoutId);
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          };
+          setLocationData(location);
+          setLocationError(null);
+          setLocationPermission('granted');
+          setIsLoadingLocation(false);
+          resolve(location);
+        },
+        (error) => {
+          clearTimeout(timeoutId);
+          console.error('Geolocation error:', error);
+          setIsLoadingLocation(false);
+          
+          // Handle different error codes
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              setLocationError('Akses lokasi ditolak. Mohon izinkan akses lokasi di pengaturan browser Anda.');
+              setLocationPermission('denied');
+              break;
+            case error.POSITION_UNAVAILABLE:
+              setLocationError('Informasi lokasi tidak tersedia. Pastikan GPS Anda aktif.');
+              break;
+            case error.TIMEOUT:
+              setLocationError('Permintaan lokasi timeout. Coba lagi.');
+              break;
+            default:
+              setLocationError('Terjadi kesalahan saat mendapatkan lokasi.');
+          }
+          
+          reject(error);
+        },
+        { 
+          enableHighAccuracy: true, 
+          timeout: 10000, 
+          maximumAge: 0 
+        }
+      );
     });
+  };
+  
+  // Request location permission explicitly with UI feedback
+  const requestLocationPermission = async () => {
+    try {
+      setScanMessage('Meminta izin lokasi...');
+      
+      // Show a custom dialog first to prepare the user
+      const result = await Swal.fire({
+        title: 'Izin Lokasi Diperlukan',
+        html: `
+          <div class="text-left">
+            <p>Untuk melakukan absensi, aplikasi memerlukan akses lokasi Anda.</p>
+            <p class="mt-2">Pastikan:</p>
+            <ul class="list-disc pl-5 mt-1">
+              <li>GPS perangkat Anda aktif</li>
+              <li>Anda mengizinkan akses lokasi untuk aplikasi ini</li>
+            </ul>
+          </div>
+        `,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'Izinkan Akses Lokasi',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#3549b1',
+      });
+      
+      if (result.isConfirmed) {
+        await getCurrentLocation();
+        return true;
+      } else {
+        setScanMessage('Akses lokasi diperlukan untuk melanjutkan');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error requesting location permission:', error);
+      return false;
+    }
   };
 
   // Handle successful QR scan
@@ -176,24 +281,70 @@ function ScanPage() {
     }
   };
   
-  // Prepare and start scanning
+  // Prepare and start scanning with enhanced location handling
   const prepareScanning = async () => {
     try {
-      // First get location
-      setScanMessage('Mendapatkan lokasi...');
-      await getCurrentLocation();
+      // First check/request location permission
+      setScanMessage('Memeriksa izin lokasi...');
       
-      // Then start camera
-      setIsScanning(true);
-      setHasPermission(true);
+      if (locationPermission === 'denied') {
+        // If permission already denied, show instructions to enable
+        Swal.fire({
+          icon: 'warning',
+          title: 'Akses Lokasi Diblokir',
+          html: `
+            <div class="text-left">
+              <p>Akses lokasi diblokir oleh browser Anda.</p>
+              <p class="mt-2">Cara mengaktifkan:</p>
+              <ol class="list-decimal pl-5 mt-1">
+                <li>Klik ikon kunci/info di address bar</li>
+                <li>Pilih "Izin Situs" atau "Pengaturan Situs"</li>
+                <li>Aktifkan izin lokasi</li>
+                <li>Muat ulang halaman</li>
+              </ol>
+            </div>
+          `,
+          confirmButtonText: 'Muat Ulang Halaman',
+          confirmButtonColor: '#3549b1',
+          showCancelButton: true,
+          cancelButtonText: 'Batal',
+        }).then((result) => {
+          if (result.isConfirmed) {
+            window.location.reload();
+          }
+        });
+        return;
+      }
+      
+      // Request location permission if not already granted
+      if (locationPermission !== 'granted') {
+        const permissionGranted = await requestLocationPermission();
+        if (!permissionGranted) return;
+      } else {
+        // Get location if permission is already granted
+        setScanMessage('Mendapatkan lokasi...');
+        await getCurrentLocation();
+      }
+      
+      // Then start camera if location was successfully retrieved
+      if (locationData) {
+        setIsScanning(true);
+        setHasPermission(true);
+        setScanMessage('Posisikan QR Code dalam bingkai');
+      } else {
+        // If still no location data, show error
+        throw new Error('Tidak dapat mendapatkan lokasi');
+      }
     } catch (error) {
       console.error('Error preparing scan:', error);
+      
       Swal.fire({
         icon: 'error',
         title: 'Akses Lokasi Gagal',
-        text: 'Tidak dapat mengakses lokasi. Pastikan Anda memberikan izin lokasi untuk aplikasi ini.',
+        text: locationError || 'Tidak dapat mengakses lokasi. Pastikan GPS aktif dan Anda memberikan izin lokasi.',
         confirmButtonColor: '#3549b1',
       });
+      
       setScanMessage('Gagal mendapatkan lokasi');
       setIsScanning(false);
     }
@@ -216,53 +367,73 @@ function ScanPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-sky-100 to-sky-200 flex flex-col text-slate-700">
       {/* Header */}
-      <header className="bg-[#3549b1] text-white py-4 px-5 flex items-center justify-between shadow-md">
+      <header className="bg-gradient-to-r from-blue-600 to-blue-500 text-white py-4 px-5 flex items-center justify-between shadow-md sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <Link href="/home" className="text-white p-2">
+          <Link href="/home" className="text-white p-2 hover:bg-white/20 rounded-full transition-colors duration-200">
             <FaArrowLeft size={18} />
           </Link>
-          <h1 className="text-xl font-semibold">Scan QR Code</h1>
+          <h1 className="text-xl font-bold">Scan QR Code</h1>
         </div>
         <FaQrcode size={24} />
       </header>
       
       <main className="flex-1 flex flex-col p-4 max-w-md mx-auto w-full">
         {/* Instructions */}
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
-          <h2 className="text-lg font-medium text-gray-800 mb-2 flex items-center gap-2">
-            <FaQrcode className="text-[#3549b1]" /> Petunjuk Scan
+        <div className="bg-white rounded-xl shadow-md p-5 mb-5 border border-sky-100 hover:shadow-lg transition-all duration-300">
+          <h2 className="text-lg font-semibold text-slate-800 mb-2 flex items-center gap-2">
+            <FaQrcode className="text-blue-500" /> Petunjuk Scan
           </h2>
-          <p className="text-gray-600 text-sm">
+          <p className="text-slate-600 text-sm mb-3">
             Arahkan kamera ke QR Code pada anjungan absensi untuk melakukan absen masuk/keluar.
-            {locationData && (
-              <span className="flex items-center mt-2 text-green-600">
-                <FaMapMarkerAlt className="mr-1" /> Lokasi terdeteksi
-              </span>
-            )}
           </p>
+          
+          {/* Location Status Indicator */}
+          <div className={`flex items-center mt-3 ${locationData ? 'text-green-600' : locationError ? 'text-red-600' : 'text-amber-600'} text-sm rounded-lg p-2 ${locationData ? 'bg-green-50' : locationError ? 'bg-red-50' : 'bg-amber-50'}`}>
+            {locationData ? (
+              <>
+                <FaMapMarkerAlt className="mr-2" />
+                <span>Lokasi terdeteksi {locationData.accuracy && `(akurasi ~${Math.round(locationData.accuracy)}m)`}</span>
+              </>
+            ) : locationError ? (
+              <>
+                <FaMapMarkerAlt className="mr-2" />
+                <span>{locationError}</span>
+              </>
+            ) : isLoadingLocation ? (
+              <>
+                <FaSpinner className="mr-2 animate-spin" />
+                <span>Mendapatkan lokasi...</span>
+              </>
+            ) : (
+              <>
+                <FaMapMarkerAlt className="mr-2" />
+                <span>Lokasi diperlukan untuk absensi</span>
+              </>
+            )}
+          </div>
         </div>
         
         {/* Camera View */}
-        <div className="relative bg-black rounded-xl overflow-hidden shadow-lg flex-1 min-h-[60vh] flex flex-col items-center justify-center">
+        <div className="relative bg-slate-900 rounded-xl overflow-hidden shadow-lg flex-1 min-h-[60vh] flex flex-col items-center justify-center border border-slate-700">
           {!isScanning && !scanResult && (
             <div className="flex flex-col items-center justify-center p-6 text-center">
-              <div className="w-20 h-20 rounded-full bg-[#3549b1] bg-opacity-10 flex items-center justify-center mb-4">
+              <div className="w-24 h-24 rounded-full bg-blue-500 bg-opacity-15 flex items-center justify-center mb-5 border border-blue-400 border-opacity-30">
                 <FaCamera size={36} className="text-white" />
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">Kamera Tidak Aktif</h3>
-              <p className="text-gray-300 mb-6 text-sm">
-                Aktifkan kamera untuk memulai scan QR Code
+              <h3 className="text-xl font-medium text-white mb-2">Kamera Tidak Aktif</h3>
+              <p className="text-gray-300 mb-6 text-sm max-w-xs">
+                Aktifkan kamera untuk memulai scan QR Code pada anjungan
               </p>
               <button
                 onClick={prepareScanning}
                 disabled={isLoadingLocation}
-                className="px-6 py-3 bg-[#3549b1] text-white rounded-lg font-medium shadow-lg hover:bg-[#3549b1] transition-colors disabled:bg-gray-400"
+                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg font-medium shadow-lg transition-all transform hover:translate-y-[-2px] disabled:bg-gray-400 disabled:transform-none disabled:from-gray-400 disabled:to-gray-400 flex items-center"
               >
                 {isLoadingLocation ? (
                   <>
-                    <FaSpinner className="animate-spin inline mr-2" /> Mendapatkan Lokasi...
+                    <FaSpinner className="animate-spin mr-2" /> Mendapatkan Lokasi...
                   </>
                 ) : (
                   'Mulai Scan'
@@ -284,21 +455,21 @@ function ScanPage() {
               {/* Custom scanning overlay */}
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
                 {/* QR Frame */}
-                <div className="w-64 h-64 relative border border-white border-opacity-30">
+                <div className="w-64 h-64 relative border-2 border-white border-opacity-50 rounded-lg">
                   {/* Corner markers */}
-                  <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-white"></div>
-                  <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-white"></div>
-                  <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-white"></div>
-                  <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-white"></div>
+                  <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-blue-400 rounded-tl-lg"></div>
+                  <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-blue-400 rounded-tr-lg"></div>
+                  <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-blue-400 rounded-bl-lg"></div>
+                  <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-blue-400 rounded-br-lg"></div>
                   
                   {/* Scanning animation */}
-                  <div className="absolute top-0 left-0 right-0 h-2 bg-[#3549b1] animate-scan"></div>
+                  <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-500 to-blue-400 animate-scan"></div>
                 </div>
                 
                 {/* Status message */}
                 <div className="absolute bottom-16 left-0 right-0 flex justify-center">
-                  <span className="bg-black bg-opacity-70 text-white px-5 py-3 rounded-full text-sm flex items-center font-medium shadow-lg">
-                    <FaSpinner className="animate-spin mr-2" /> {scanMessage}
+                  <span className="bg-slate-800 bg-opacity-80 text-white px-6 py-3 rounded-full text-sm flex items-center font-medium shadow-lg border border-slate-700">
+                    <FaSpinner className="animate-spin mr-2 text-blue-400" /> {scanMessage}
                   </span>
                 </div>
               </div>
@@ -310,9 +481,28 @@ function ScanPage() {
         {isScanning && (
           <button 
             onClick={() => setIsScanning(false)} 
-            className="mt-6 py-4 px-6 bg-white border border-gray-300 text-gray-700 rounded-full font-medium shadow-md flex items-center justify-center mx-auto hover:bg-gray-100 transition-colors z-30"
+            className="mt-6 py-4 px-8 bg-white border border-sky-200 text-slate-700 rounded-full font-medium shadow-md flex items-center justify-center mx-auto hover:bg-sky-50 transition-all duration-300 transform hover:translate-y-[-2px]"
           >
             Batal
+          </button>
+        )}
+        
+        {/* Retry location button - only show when there's a location error */}
+        {!isScanning && locationError && (
+          <button 
+            onClick={() => getCurrentLocation()} 
+            disabled={isLoadingLocation}
+            className="mt-6 py-4 px-8 bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-medium shadow-md flex items-center justify-center mx-auto hover:bg-blue-200 transition-all duration-300"
+          >
+            {isLoadingLocation ? (
+              <>
+                <FaSpinner className="animate-spin mr-2" /> Mencoba Ulang...
+              </>
+            ) : (
+              <>
+                <FaMapMarkerAlt className="mr-2" /> Coba Dapatkan Lokasi Lagi
+              </>
+            )}
           </button>
         )}
       </main>
@@ -326,6 +516,7 @@ function ScanPage() {
         }
         .animate-scan {
           animation: scan 1.5s linear infinite;
+          box-shadow: 0 0 10px rgba(59, 130, 246, 0.7);
         }
         
         /* Styling for QR scanner container */
