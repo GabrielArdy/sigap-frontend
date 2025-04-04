@@ -2,7 +2,7 @@
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import React, { useState, useEffect } from 'react';
-import { FaUserCircle, FaBell, FaSignOutAlt, FaSignInAlt, FaDoorOpen, FaClipboardList, FaHistory, FaClock, FaCalendarAlt, FaIdCard, FaCheckCircle } from 'react-icons/fa';
+import { FaUserCircle, FaBell, FaSignOutAlt, FaSignInAlt, FaDoorOpen, FaClipboardList, FaHistory, FaClock, FaCalendarAlt, FaIdCard, FaCheckCircle, FaDownload } from 'react-icons/fa';
 import AttendanceService from '../api/attendance_service';
 import AuthWrapper from '@/components/AuthWrapper';
 
@@ -12,10 +12,68 @@ function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // PWA installation states
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
   // Animation states
   const [checkInActive, setCheckInActive] = useState(false);
   const [checkOutActive, setCheckOutActive] = useState(false);
   const router = useRouter();
+
+  // PWA installation check
+  useEffect(() => {
+    // Check if running as standalone PWA (installed)
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+      setIsInstalled(true);
+      return;
+    }
+
+    // Listen for beforeinstallprompt event to detect if app can be installed
+    const handleBeforeInstallPrompt = (e) => {
+      // Prevent Chrome 76+ from automatically showing the prompt
+      e.preventDefault();
+      // Stash the event so it can be triggered later
+      setDeferredPrompt(e);
+      // Show the install banner
+      setShowInstallBanner(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Check if app was successfully installed
+    window.addEventListener('appinstalled', () => {
+      setIsInstalled(true);
+      setShowInstallBanner(false);
+      console.log('PWA was installed');
+    });
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  // Handle PWA installation
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    
+    // Show the install prompt
+    deferredPrompt.prompt();
+    
+    // Wait for the user to respond to the prompt
+    const choiceResult = await deferredPrompt.userChoice;
+    
+    if (choiceResult.outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    } else {
+      console.log('User dismissed the install prompt');
+    }
+    
+    // Clear the deferredPrompt for next time
+    setDeferredPrompt(null);
+    setShowInstallBanner(false);
+  };
 
   // Fetch user data on component mount
   useEffect(() => {
@@ -125,6 +183,27 @@ function HomePage() {
       </header>
 
       <main className="container mx-auto px-4 py-6 flex flex-col gap-6 max-w-md">
+        {/* PWA Installation Banner */}
+        {showInstallBanner && (
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-4 rounded-xl shadow-lg animate-fade-in mb-1">
+            <div className="flex items-center">
+              <div className="bg-white/20 p-2 rounded-lg mr-3">
+                <FaDownload className="text-white text-lg" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold">Instal Aplikasi SIGAP</h3>
+                <p className="text-xs text-white/80">Akses lebih cepat tanpa browser</p>
+              </div>
+              <button 
+                onClick={handleInstallClick}
+                className="bg-white text-blue-600 hover:bg-blue-100 py-1.5 px-3 rounded-lg font-medium text-sm transition-colors shadow"
+              >
+                Instal
+              </button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center py-10">
             <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-3 border-b-3 border-blue-500"></div>
