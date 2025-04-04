@@ -74,10 +74,6 @@ function AttendancePage() {
 
   // Fetch attendance data from API
   useEffect(() => {
-    // Only run on client-side
-    if (!isClient) return;
-    
-    let isMounted = true; // Define isMounted variable here
     setLoading(true);
     
     const fetchData = async () => {
