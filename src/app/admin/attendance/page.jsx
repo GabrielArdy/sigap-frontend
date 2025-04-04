@@ -74,11 +74,14 @@ function AttendancePage() {
 
   // Fetch attendance data from API
   useEffect(() => {
+    // Only run on client-side
+    if (!isClient) return;
+    
+    let isMounted = true; // Define isMounted variable here
     setLoading(true);
     
     const fetchData = async () => {
       try {
-        setLoading(true);
         // Wait for dynamic import to be available
         const AttendanceService = await AttendanceServiceImport;
         const Swal = await SwalImport;
