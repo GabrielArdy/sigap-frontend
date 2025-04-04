@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaChevronLeft, FaPlus, FaClipboardList, FaCalendarAlt, FaCheck, FaTimes, FaClock, FaUserCircle } from 'react-icons/fa';
 import AuthWrapper from '@/components/AuthWrapper';
+import LeaveRequestService from '@/app/api/leave_request';
 
 function LeaveRequestList() {
   const router = useRouter();
@@ -24,53 +25,32 @@ function LeaveRequestList() {
         const user = JSON.parse(userString);
         const userId = user.userId;
         
-        // In a real application, you would fetch data from an API
-        // const response = await LeaveRequestService.getUserRequests(userId);
+        // Fetch data from the API
+        const response = await LeaveRequestService.getRequestByUserId(userId);
         
-        // For now, we'll simulate a response with mock data
-        setTimeout(() => {
-          const mockData = [
-            {
-              id: '1',
-              type: 'leave',
-              startDate: new Date(Date.now() + 86400000 * 3), // 3 days from now
-              endDate: new Date(Date.now() + 86400000 * 5), // 5 days from now
-              reason: 'Acara keluarga',
-              status: 'pending',
-              createdAt: new Date(Date.now() - 86400000), // 1 day ago
-              reviewedBy: null // Not yet reviewed
-            },
-            {
-              id: '2',
-              type: 'sick',
-              startDate: new Date(Date.now() - 86400000 * 5), // 5 days ago
-              endDate: new Date(Date.now() - 86400000 * 3), // 3 days ago
-              reason: 'Demam dan flu',
-              status: 'approved',
-              createdAt: new Date(Date.now() - 86400000 * 6), // 6 days ago
-              reviewedBy: {
-                name: "Kepala Sekolah",
-                date: new Date(Date.now() - 86400000 * 2) // 2 days ago
-              }
-            },
-            {
-              id: '3',
-              type: 'leave',
-              startDate: new Date(Date.now() - 86400000 * 10), // 10 days ago
-              endDate: new Date(Date.now() - 86400000 * 10), // Same day (single day)
-              reason: 'Urusan keluarga mendesak',
-              status: 'rejected',
-              createdAt: new Date(Date.now() - 86400000 * 11), // 11 days ago
-              reviewedBy: {
-                name: "Wakil Kepala Sekolah",
-                date: new Date(Date.now() - 86400000 * 9) // 9 days ago
-              }
-            }
-          ];
+        if (response && response.success) {
+          // Map API data to the format expected by the UI
+          const formattedData = response.data.map(item => ({
+            id: item.requestId,
+            type: item.requestType,
+            startDate: new Date(item.requestedStartDate),
+            endDate: new Date(item.requestedEndDate),
+            reason: item.description,
+            status: item.approvalStatus.toLowerCase(),
+            createdAt: new Date(item.requestedAt),
+            // Only include reviewedBy if not pending
+            reviewedBy: item.approvalStatus.toLowerCase() !== 'pending' ? {
+              name: item.approverName,
+              date: new Date(item.updatedAt)
+            } : null
+          }));
           
-          setRequests(mockData);
-          setLoading(false);
-        }, 1000);
+          setRequests(formattedData);
+        } else {
+          setError('Failed to fetch leave requests');
+        }
+        
+        setLoading(false);
       } catch (err) {
         setError('Error fetching requests: ' + (err.message || 'Unknown error'));
         setLoading(false);

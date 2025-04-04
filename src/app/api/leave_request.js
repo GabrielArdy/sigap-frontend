@@ -61,7 +61,18 @@ const LeaveRequestService = {
             return error.response.data;
         }
     },
-    changeApprovalStatus: async ()
+    changeApprovalStatus: async (requestId, data) => {
+        try {
+            const response = await api.patch(`/leaves/requests/${requestId}/approval`, data, {
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                }
+            });
+            return response.data;
+        } catch (error) {
+            return error.response.data;
+        }
+    }
 }
 
 export default LeaveRequestService;
