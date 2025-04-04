@@ -3,17 +3,8 @@ import { useState, useEffect } from 'react';
 import { FiSearch, FiEdit2, FiFilter, FiRefreshCw, FiCalendar } from 'react-icons/fi';
 import dynamic from 'next/dynamic';
 import AdminAuthWrapper from '@/components/AdminAuthWrapper';
-
-// Dynamically import SweetAlert2 with SSR disabled
-const SwalImport = dynamic(() => import('sweetalert2'), { 
-  ssr: false 
-});
-
-// Dynamically import the AttendanceService with SSR disabled
-const AttendanceServiceImport = dynamic(
-  () => import('@/app/api/attendance_service').then((mod) => mod.default),
-  { ssr: false }
-);
+import AttendanceService from '@/app/api/attendance_service';
+import Swal from 'sweetalert2';
 
 // Create a component that will only render on the client side
 function AttendancePage() {
@@ -75,13 +66,10 @@ function AttendancePage() {
   // Fetch attendance data from API
   useEffect(() => {
     setLoading(true);
+    let isMounted = true;
     
     const fetchData = async () => {
       try {
-        // Wait for dynamic import to be available
-        const AttendanceService = await AttendanceServiceImport;
-        const Swal = await SwalImport;
-        
         const response = await AttendanceService.getAllAttendance();
         
         // Only update state if component is still mounted
@@ -140,7 +128,6 @@ function AttendancePage() {
       } catch (error) {
         if (isMounted) {
           console.error("Error fetching attendance data:", error);
-          const Swal = await SwalImport;
           Swal.fire({
             icon: 'error',
             title: 'Gagal memuat data',
@@ -220,8 +207,6 @@ function AttendancePage() {
   const handleEditAttendance = async (attendance) => {
     setSelectedAttendance(attendance);
     setNewStatus(attendance.status);
-    
-    const Swal = await SwalImport;
     
     // Convert from display status back to API status code
     const reverseStatusMapping = Object.entries(statusMapping).reduce((acc, [key, value]) => {
