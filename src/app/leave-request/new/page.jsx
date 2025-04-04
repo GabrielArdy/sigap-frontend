@@ -5,6 +5,8 @@ import Calendar from 'react-calendar';
 import AuthWrapper from '@/components/AuthWrapper';
 import 'react-calendar/dist/Calendar.css';
 import { FaUserCircle, FaCalendarAlt, FaFileAlt, FaClipboardList, FaChevronLeft } from 'react-icons/fa';
+import LeaveRequestService from '@/app/api/leave_request';
+import { uploadFile } from '@/utils/fileUpload';
 
 function LeaveRequestForm() {
   const router = useRouter();
@@ -73,15 +75,24 @@ function LeaveRequestForm() {
     }
   };
 
-  // Handle file input change
+  // Handle file input change with updated validation
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size exceeds 5MB limit');
+      // Check file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        setError('File size exceeds 2MB limit');
         e.target.value = null;
         return;
       }
+      
+      // Check if file is an image
+      if (!file.type.startsWith('image/')) {
+        setError('Only image files are allowed');
+        e.target.value = null;
+        return;
+      }
+      
       setSupportingDocument(file);
       setError('');
     }
@@ -106,52 +117,49 @@ function LeaveRequestForm() {
     setError('');
     
     try {
-      // Prepare form data for submission
-      const formData = new FormData();
-      formData.append('userId', userData.userId);
-      formData.append('requestType', requestType);
-      
-      // Format dates for submission
-      if (Array.isArray(selectedDates)) {
-        // Range of dates
-        formData.append('startDate', selectedDates[0].toISOString());
-        formData.append('endDate', selectedDates[1].toISOString());
-      } else {
-        // Single date
-        formData.append('startDate', selectedDates.toISOString());
-        formData.append('endDate', selectedDates.toISOString());
-      }
-      
-      formData.append('reason', reason);
+      // First handle file upload if there's a supporting document
+      let attachmentPath = '';
       if (supportingDocument) {
-        formData.append('document', supportingDocument);
+        const uploadResult = await uploadFile(supportingDocument);
+        if (!uploadResult.success) {
+          throw new Error(`Failed to upload document: ${uploadResult.error}`);
+        }
+        attachmentPath = uploadResult.filepath;
       }
       
-      // Here you would make an API call to submit the form
-      // const response = await LeaveRequestService.submitRequest(formData);
+      // Prepare request data
+      const requestData = {
+        requestType: requestType,
+        requesterId: userData.userId,
+        requestedStartDate: Array.isArray(selectedDates) 
+          ? selectedDates[0].toISOString() 
+          : selectedDates.toISOString(),
+        requestedEndDate: Array.isArray(selectedDates) 
+          ? selectedDates[1].toISOString() 
+          : selectedDates.toISOString(),
+        description: reason,
+        attachment: attachmentPath
+      };
       
-      // For now, we'll simulate a successful submission
-      console.log('Submitting form data:', {
-        userId: userData.userId,
-        requestType,
-        dates: selectedDates,
-        reason,
-        hasDocument: !!supportingDocument
-      });
+      console.log('Submitting request:', requestData);
       
-      // Mock successful response
-      setTimeout(() => {
+      // Submit request to backend
+      const response = await LeaveRequestService.createNewRequest(requestData);
+      
+      if (response.status === 'success' || response.success) {
         setSuccess('Leave request submitted successfully!');
-        setIsSubmitting(false);
         
         // Redirect after a short delay
         setTimeout(() => {
           router.push('/leave-request');
         }, 2000);
-      }, 1500);
-      
+      } else {
+        throw new Error(response.message || 'Failed to submit request');
+      }
     } catch (err) {
       setError('Error submitting request: ' + (err.message || 'Unknown error'));
+      console.error('Submit error:', err);
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -387,13 +395,13 @@ function LeaveRequestForm() {
                   id="document"
                   onChange={handleFileChange}
                   className="hidden"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept="image/*"
                 />
                 <label htmlFor="document" className="cursor-pointer">
                   <FaFileAlt className="mx-auto h-10 w-10 text-slate-400 mb-2" />
                   <div className="text-sm font-medium text-blue-600">Klik untuk mengunggah</div>
                   <p className="text-xs text-slate-500 mt-1">
-                    PDF, JPG, or PNG (Max. 5MB)
+                    Hanya gambar (Max. 2MB)
                   </p>
                 </label>
                 {supportingDocument && (
