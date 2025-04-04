@@ -1,10 +1,21 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { FiSearch, FiEdit2, FiFilter, FiRefreshCw, FiCalendar } from 'react-icons/fi';
-import Swal from 'sweetalert2';
-import AttendanceService from '@/app/api/attendance_service';
+import dynamic from 'next/dynamic';
 import AdminAuthWrapper from '@/components/AdminAuthWrapper';
 
+// Dynamically import SweetAlert2 with SSR disabled
+const SwalImport = dynamic(() => import('sweetalert2'), { 
+  ssr: false 
+});
+
+// Dynamically import the AttendanceService with SSR disabled
+const AttendanceServiceImport = dynamic(
+  () => import('@/app/api/attendance_service').then((mod) => mod.default),
+  { ssr: false }
+);
+
+// Create a component that will only render on the client side
 function AttendancePage() {
   const [attendanceData, setAttendanceData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -16,8 +27,22 @@ function AttendancePage() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [openEdit, setOpenEdit] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    // Safe initialization that works on both client and server
+    return typeof window !== 'undefined' ? new Date().getMonth() + 1 : 1;
+  });
+  const [selectedYear, setSelectedYear] = useState(() => {
+    // Safe initialization that works on both client and server
+    return typeof window !== 'undefined' ? new Date().getFullYear() : 2023;
+  });
+  
+  // Use state to track if component is mounted on client-side
+  const [isClient, setIsClient] = useState(false);
+  
+  // Using useEffect to set isClient to true after component mounted
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   // Month names mapping
   const monthNames = [
@@ -44,19 +69,26 @@ function AttendancePage() {
   };
   
   // Generate an array of years (current year - 5 to current year + 5)
-  const currentYear = new Date().getFullYear();
+  const currentYear = isClient ? new Date().getFullYear() : 2023;
   const years = Array.from({ length: 11 }, (_, index) => currentYear - 5 + index);
 
   // Fetch attendance data from API
   useEffect(() => {
-    // Only run on client-side
-    if (typeof window === 'undefined') return;
+    // Only execute if we're in the browser and component is mounted
+    if (!isClient) return;
     
-    setLoading(true);
-    
+    let isMounted = true;
     const fetchData = async () => {
       try {
+        setLoading(true);
+        // Wait for dynamic import to be available
+        const AttendanceService = await AttendanceServiceImport;
+        const Swal = await SwalImport;
+        
         const response = await AttendanceService.getAllAttendance();
+        
+        // Only update state if component is still mounted
+        if (!isMounted) return;
         
         if (response.success) {
           // Process the attendance data from API
@@ -92,7 +124,7 @@ function AttendancePage() {
           // Extract unique staff list from attendance data
           const uniqueStaffList = Array.from(
             new Set(processedData.map(item => item.staffName))
-          ).map((name, index) => ({
+          ).map((name) => ({
             id: name,
             name: name
           }));
@@ -109,20 +141,39 @@ function AttendancePage() {
           });
         }
       } catch (error) {
-        console.error("Error fetching attendance data:", error);
-        Swal.fire({
-          icon: 'error',
-          title: 'Gagal memuat data',
-          text: 'Terjadi kesalahan saat memuat data kehadiran'
-        });
+        if (isMounted) {
+          console.error("Error fetching attendance data:", error);
+          const Swal = await SwalImport;
+          Swal.fire({
+            icon: 'error',
+            title: 'Gagal memuat data',
+            text: 'Terjadi kesalahan saat memuat data kehadiran'
+          });
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
     
     fetchData();
-  }, []);
+    
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, [isClient]);
 
+  // Only continue with rendering if we're on the client side
+  if (!isClient) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+  
   // Handle staff selection
   const handleStaffChange = (event) => {
     setSelectedStaff(event.target.value);
@@ -169,9 +220,11 @@ function AttendancePage() {
   };
 
   // Handle edit attendance
-  const handleEditAttendance = (attendance) => {
+  const handleEditAttendance = async (attendance) => {
     setSelectedAttendance(attendance);
     setNewStatus(attendance.status);
+    
+    const Swal = await SwalImport;
     
     // Convert from display status back to API status code
     const reverseStatusMapping = Object.entries(statusMapping).reduce((acc, [key, value]) => {
@@ -507,10 +560,15 @@ function AttendancePage() {
   );
 }
 
+// Use dynamic import with SSR disabled for the AttendancePage component
+const DynamicAttendancePage = dynamic(() => Promise.resolve(AttendancePage), {
+  ssr: false
+});
+
 export default function Page() {
   return (
     <AdminAuthWrapper>
-      <AttendancePage />
+      <DynamicAttendancePage />
     </AdminAuthWrapper>
   );
 }
