@@ -74,10 +74,8 @@ function AttendancePage() {
 
   // Fetch attendance data from API
   useEffect(() => {
-    // Only execute if we're in the browser and component is mounted
-    if (!isClient) return;
+    setLoading(true);
     
-    let isMounted = true;
     const fetchData = async () => {
       try {
         setLoading(true);
