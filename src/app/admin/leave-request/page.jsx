@@ -113,6 +113,27 @@ function LeaveRequestPage() {
     }
   };
 
+  // Helper to format date as requested
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays <= 7) {
+      // Format as DD MMM for dates within 7 days
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = date.toLocaleString('id-ID', { month: 'short' });
+      return `${day} ${month}`;
+    } else {
+      // Format as DD/MM/YYYY for older dates
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -163,12 +184,10 @@ function LeaveRequestPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Karyawan</th>
-                {/* Removed department column */}
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Periode</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Guru</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis Pengajuan</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal Pengajuan</th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
               </tr>
             </thead>
@@ -181,25 +200,21 @@ function LeaveRequestPage() {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className={`text-sm ${!request.isRead ? 'font-bold' : 'font-medium'} text-gray-900`}>
                           {request.employee}
                         </div>
                       </div>
                     </td>
-                    {/* Removed department cell */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${!request.isRead ? 'font-bold' : ''} text-gray-500`}>
                       {request.type}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {request.startDate} - {request.endDate}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(request.status)}`}>
                         {request.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(request.submitDate).toLocaleDateString()}
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${!request.isRead ? 'font-bold' : ''} text-gray-500`}>
+                      {formatDate(request.submitDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
@@ -214,7 +229,7 @@ function LeaveRequestPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
                     Tidak ada pengajuan izin yang ditemukan.
                   </td>
                 </tr>
@@ -237,22 +252,22 @@ function LeaveRequestPage() {
                 >
                   <div className="px-4 py-3" onClick={() => handleRequestClick(request)}>
                     <div className="flex justify-between">
-                      <span className={`text-sm font-medium text-gray-900 ${!request.isRead ? 'font-bold' : ''}`}>
+                      <span className={`text-sm ${!request.isRead ? 'font-bold' : 'font-medium'} text-gray-900`}>
                         {request.employee}
                       </span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(request.submitDate).toLocaleDateString()}
+                      <span className={`text-xs ${!request.isRead ? 'font-bold' : ''} text-gray-500`}>
+                        {formatDate(request.submitDate)}
                       </span>
                     </div>
-                    <div className="mt-1">
-                      <p className="text-sm text-gray-700">
-                        {request.type}: {request.startDate} - {request.endDate}
+                    <div className="mt-1 flex justify-between">
+                      <p className={`text-sm ${!request.isRead ? 'font-bold' : ''} text-gray-700`}>
+                        {request.type}
                       </p>
-                    </div>
-                    <div className="mt-2 flex justify-between">
                       <span className={`inline-flex text-xs px-2 py-1 rounded-full ${getStatusColor(request.status)}`}>
                         {request.status}
                       </span>
+                    </div>
+                    <div className="mt-2 flex justify-end">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
