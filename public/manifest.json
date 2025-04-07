@@ -3,8 +3,8 @@
   "short_name": "SIGAP",
   "start_url": "/login",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#3549b1",
+  "background_color": "#bae6fd",
+  "theme_color": "#2563eb",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",

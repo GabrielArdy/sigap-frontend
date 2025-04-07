@@ -15,7 +15,7 @@ export const metadata = {
   title: "SIGAP - Sistem Informasi Guru Absensi dan Presensi",
   description: "Application for attendance management",
   manifest: "/manifest.json",
-  themeColor: "#1d4ed8",
+  themeColor: "#2563eb",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
