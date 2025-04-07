@@ -35,7 +35,7 @@ function LeaveRequestDetailPage() {
             reason: response.data.description,
             status: response.data.approvalStatus || 'Pending', // Fixed typo: aprovalStatus -> approvalStatus
             submitDate: response.data.requestedAt,
-            isRead: response.data.isOpen, // Corrected: isOpen means it has been read
+            isRead: response.data.isOpen,
             documentUrl: response.data.attachment ? `data:image/jpeg;base64,${response.data.attachment}` : null,
             // Add any additional fields we want to display
             approverComment: response.data.approverComment || '',

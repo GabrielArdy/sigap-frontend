@@ -54,6 +54,8 @@ function HomePage() {
   const formatTime = (isoString) => {
     if (!isoString) return "-";
     const date = new Date(isoString);
+    // Check if date is equal to the Unix epoch (Jan 1, 1970) or invalid
+    if (date.getTime() === 0 || isNaN(date.getTime())) return "-";
     return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   };
 

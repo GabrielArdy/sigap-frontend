@@ -35,6 +35,17 @@ function LeaveRequestPage() {
           submitDate: req.requestedAt,
           approverComment: req.approverComment || '-' // Add approver comment
         }));
+        
+        // Sort requests: prioritize unread requests first, then by date
+        transformedRequests.sort((a, b) => {
+          // First priority: unread status (isRead = false comes first)
+          if (!a.isRead && b.isRead) return -1;
+          if (a.isRead && !b.isRead) return 1;
+          
+          // Second priority: date (newer requests come first)
+          return new Date(b.submitDate) - new Date(a.submitDate);
+        });
+        
         setLeaveRequests(transformedRequests);
       } else {
         setError('Failed to fetch leave requests');

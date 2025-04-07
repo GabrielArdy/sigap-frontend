@@ -106,7 +106,9 @@ function AttendanceReportPage() {
       
       // Format check-in time
       const checkInTime = item.checkIn ? new Date(item.checkIn) : null;
-      const formattedCheckIn = checkInTime ? 
+      // Check if checkIn is Unix epoch (1970-01-01) or null
+      const isCheckInUnixEpoch = checkInTime && checkInTime.getTime() <= 86400000; // One day in milliseconds
+      const formattedCheckIn = checkInTime && !isCheckInUnixEpoch ? 
         checkInTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
       
       // Format check-out time
