@@ -45,48 +45,48 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      {/* Background with different styles for mobile vs desktop */}
-      <div className="fixed inset-0 bg-white md:bg-gradient-to-br md:from-[#e8eefb] md:to-[#d5e0f5] -z-10"></div>
+      {/* Enhanced gradient background */}
+      <div className="fixed inset-0 bg-gradient-to-br from-sky-100 via-sky-200 to-blue-200 md:from-sky-100 md:via-blue-100 md:to-indigo-100 -z-10"></div>
       
-      {/* Mobile header - only visible on small screens */}
-      <div className="fixed top-0 left-0 right-0 bg-[#3549b1] py-6 flex justify-center md:hidden z-10">
+      {/* Mobile header with enhanced styling */}
+      <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-blue-600 to-blue-500 py-7 flex justify-center md:hidden z-10 shadow-lg">
         <Image 
           src="/app-icon.png" 
           alt="App Logo" 
-          width={80} 
-          height={80}
-          className="object-contain"
+          width={90} 
+          height={90}
+          className="object-contain filter drop-shadow-md transform hover:scale-105 transition-transform duration-300"
         />
       </div>
       
-      <div className="w-full h-full md:h-auto md:max-w-md bg-white md:rounded-xl md:shadow-xl overflow-hidden flex flex-col">
-        {/* Desktop header - hidden on mobile */}
-        <div className="hidden md:flex bg-[#3549b1] py-6 px-4 justify-center">
+      <div className="w-full h-full md:h-auto md:max-w-md bg-white md:rounded-2xl md:shadow-[0_10px_30px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col border md:border-white/50 backdrop-blur-sm transition-all duration-300 hover:shadow-[0_15px_35px_rgba(0,0,0,0.18)]">
+        {/* Desktop header with enhanced styling */}
+        <div className="hidden md:flex bg-gradient-to-r from-blue-600 to-blue-500 py-8 px-4 justify-center">
           <Image 
             src="/app-icon.png" 
             alt="App Logo" 
-            width={100} 
-            height={100}
-            className="object-contain"
+            width={110} 
+            height={110}
+            className="object-contain filter drop-shadow-lg transform hover:scale-105 transition-transform duration-300"
           />
         </div>
         
-        <div className="pt-28 pb-16 px-6 sm:px-10 md:pt-8 md:pb-10 flex-grow flex flex-col justify-center">
-          <h2 className="text-center text-2xl font-bold text-[#20264b] mb-8 md:mb-6">
-            Selamat Datang
+        <div className="pt-32 pb-16 px-8 sm:px-12 md:pt-10 md:pb-12 flex-grow flex flex-col justify-center">
+          <h2 className="text-center text-3xl font-bold text-slate-800 mb-10 md:mb-8 tracking-tight">
+            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Selamat Datang</span>
           </h2>
           
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
+            <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl mb-6 shadow-sm" role="alert">
               <span className="block sm:inline">{error}</span>
             </div>
           )}
           
           <form onSubmit={handleSubmit} className="flex-grow flex flex-col md:block">
-            <div className="space-y-6 md:space-y-5 flex-grow flex flex-col">
-              <div className="rounded-lg md:p-0">
-                <label htmlFor="email" className="block text-sm font-medium text-[#2e3a7a] mb-2 md:mb-1">
-                  email
+            <div className="space-y-7 md:space-y-6 flex-grow flex flex-col">
+              <div className="rounded-lg md:p-0 transition-all duration-200">
+                <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2.5">
+                  Email
                 </label>
                 <input
                   id="email"
@@ -95,17 +95,17 @@ export default function Login() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-[#c8d7f5] bg-white text-[#333] focus:ring-2 focus:ring-[#3549b1] focus:border-transparent transition duration-200"
+                  className="w-full px-5 py-3.5 rounded-xl border border-sky-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 shadow-sm hover:shadow-md"
                   placeholder="Masukkan Email"
                   disabled={loading}
                 />
               </div>
               
-              <div className="rounded-lg md:p-0">
-                <label htmlFor="password" className="block text-sm font-medium text-[#2e3a7a] mb-2 md:mb-1">
+              <div className="rounded-lg md:p-0 transition-all duration-200">
+                <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-2.5">
                   Password
                 </label>
-                <div className="relative">
+                <div className="relative group">
                   <input
                     id="password"
                     name="password"
@@ -113,33 +113,33 @@ export default function Login() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg border border-[#c8d7f5] bg-white text-[#333] focus:ring-2 focus:ring-[#3549b1] focus:border-transparent transition duration-200"
+                    className="w-full px-5 py-3.5 rounded-xl border border-sky-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 shadow-sm group-hover:shadow-md"
                     placeholder="Masukkan password"
                     disabled={loading}
                   />
                   <button 
                     type="button"
                     onClick={togglePasswordVisibility}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-blue-500 transition-colors duration-200"
                     disabled={loading}
                   >
-                    {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                    {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
                   </button>
                 </div>
               </div>
               
-              <div className="pt-4 mt-auto">
+              <div className="pt-7 mt-auto">
                 <button
                   type="submit"
-                  className="w-full py-3 px-4 bg-[#3549b1] hover:bg-[#3549b1] text-white font-medium rounded-lg shadow-md hover:shadow-lg transition duration-200 focus:ring-2 focus:ring-[#c8d7f5] focus:ring-opacity-50 disabled:opacity-70"
+                  className="w-full py-4 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 focus:ring-2 focus:ring-blue-300 focus:ring-opacity-50 disabled:opacity-70"
                   disabled={loading}
                 >
                   {loading ? 'Logging in...' : 'Login'}
                 </button>
               </div>
               
-              <div className="text-center text-sm text-[#33419a] mt-4">
-                <a href="#" className="hover:text-[#3549b1] transition duration-200">
+              <div className="text-center text-sm mt-5">
+                <a href="#" className="text-blue-500 hover:text-blue-700 font-medium transition-all duration-200 hover:underline">
                   Lupa Password?
                 </a>
               </div>

@@ -1,12 +1,10 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { FiMenu, FiChevronDown, FiChevronRight, FiLogOut, FiUser, FiSettings, FiUsers, FiCalendar, FiHome, FiMonitor } from 'react-icons/fi';
+import { FiMenu, FiChevronDown, FiChevronRight, FiLogOut, FiUser, FiSettings, FiUsers, FiCalendar, FiHome, FiMonitor, FiFileText } from 'react-icons/fi';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
-
-
 
 export default function DashboardLayout({ children }) {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
@@ -14,20 +12,28 @@ export default function DashboardLayout({ children }) {
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isProfileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [isBrowser, setIsBrowser] = useState(false); // Track if we're in browser environment
   const pathname = usePathname();
   const router = useRouter();
 
+  // Set isBrowser to true once component mounts
+  useEffect(() => {
+    setIsBrowser(true);
+  }, []);
+
   // Get user from localStorage
   useEffect(() => {
-    try {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        setUser(JSON.parse(userData));
+    if (isBrowser) {
+      try {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+          setUser(JSON.parse(userData));
+        }
+      } catch (error) {
+        console.error('Error parsing user data from localStorage:', error);
       }
-    } catch (error) {
-      console.error('Error parsing user data from localStorage:', error);
     }
-  }, []);
+  }, [isBrowser]);
 
   // Get user initials for avatar
   const getUserInitials = () => {
@@ -46,12 +52,16 @@ export default function DashboardLayout({ children }) {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
-    router.push('/auth/admin/login')
+    if (isBrowser) {
+      localStorage.clear();
+      router.push('/auth/admin/login');
+    }
   }
 
   // Handle responsive sidebar
   useEffect(() => {
+    if (!isBrowser) return; // Skip if not in browser
+    
     const handleResize = () => {
       if (window.innerWidth < 768) {
         setIsMobile(true);
@@ -67,10 +77,12 @@ export default function DashboardLayout({ children }) {
     
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [isBrowser]);
 
   // Close sidebar when clicking outside on mobile
   useEffect(() => {
+    if (!isBrowser) return; // Skip if not in browser
+    
     const handleClickOutside = (e) => {
       if (isMobile && isSidebarOpen && !e.target.closest('.sidebar')) {
         setSidebarOpen(false);
@@ -79,10 +91,12 @@ export default function DashboardLayout({ children }) {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isMobile, isSidebarOpen]);
+  }, [isMobile, isSidebarOpen, isBrowser]);
 
   // Handle profile dropdown close when clicking elsewhere
   useEffect(() => {
+    if (!isBrowser) return; // Skip if not in browser
+    
     const handleClickOutside = (e) => {
       if (!e.target.closest('.profile-dropdown') && isProfileDropdownOpen) {
         setProfileDropdownOpen(false);
@@ -91,7 +105,7 @@ export default function DashboardLayout({ children }) {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isProfileDropdownOpen]);
+  }, [isProfileDropdownOpen, isBrowser]);
 
   // Check if a menu item is active
   const isActive = (path) => {
@@ -120,6 +134,11 @@ export default function DashboardLayout({ children }) {
       name: 'Data Kehadiran',
       icon: <FiCalendar className="w-5 h-5" />,
       path: '/admin/attendance',
+    },
+    {
+      name: 'Data Pengajuan',
+      icon: <FiFileText className="w-5 h-5" />,
+      path: '/admin/leave-request',
     },
     {
       name: 'Pengaturan',

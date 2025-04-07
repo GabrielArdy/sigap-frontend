@@ -174,7 +174,7 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
     console.log('Excel export - Total employees from API:', attendanceData.attendancesData.length);
     
     // Transform API data to a more usable format
-    attendanceData.attendancesData.forEach(employee => {
+    attendanceData.attendancesData.forEach((employee, index) => {
       const attendanceByDate = new Map();
       
       if (employee.attendanceData && employee.attendanceData.length > 0) {
@@ -190,15 +190,29 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
         });
       }
       
-      // Use any property that's unique to identify employees
-      // Here we use a combination of name and position if NIP is N/A
-      const key = employee.nip !== 'N/A' ? employee.nip : `${employee.fullName}-${employee.position}`;
+      // Create a truly unique key by combining fullName, position and index
+      // This prevents duplicate NIP issues where multiple employees have the same NIP or "N/A"
+      const key = `${employee.fullName}-${employee.position}-${employee.nip}-${index}`;
+      
+      // Store original info for debugging
+      const debugInfo = {
+        fullName: employee.fullName,
+        nip: employee.nip,
+        position: employee.position,
+        dataCount: employee.attendanceData ? employee.attendanceData.length : 0
+      };
       
       attendanceMap.set(key, {
         name: employee.fullName,
         position: employee.position,
-        attendance: attendanceByDate
+        attendance: attendanceByDate,
+        debugInfo: debugInfo  // Store debug info
       });
+      
+      // Add debug log for employees with attendance data
+      if (employee.attendanceData && employee.attendanceData.length > 0) {
+        console.log(`Mapped attendance for: ${employee.fullName}, NIP: ${employee.nip}, Data: ${employee.attendanceData.length} records`);
+      }
     });
     
     // Use the data directly from the API instead of the passed employees
@@ -206,7 +220,10 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
     employeesList = [];
     let employeeId = 1;
     
-    attendanceData.attendancesData.forEach(employee => {
+    attendanceData.attendancesData.forEach((employee, index) => {
+      // Create the same unique key as above
+      const uniqueKey = `${employee.fullName}-${employee.position}-${employee.nip}-${index}`;
+      
       // Include all employees, even those with NIP "N/A"
       employeesList.push({
         id: employeeId++,
@@ -215,7 +232,7 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
         nip: employee.nip !== 'N/A' ? employee.nip : '',
         position: employee.position,
         // Store the lookup key for attendance data
-        lookupKey: employee.nip !== 'N/A' ? employee.nip : `${employee.fullName}-${employee.position}`
+        lookupKey: uniqueKey  // Use uniqueKey instead of just NIP
       });
     });
   }
@@ -258,9 +275,14 @@ export const exportAttendanceToExcel = async (employees, daysInMonth, currentMon
         let cellValue = '';
         
         // Check if we have attendance data for this employee
-        const employeeData = attendanceMap.get(employee.lookupKey || employee.nip);
+        const employeeData = attendanceMap.get(employee.lookupKey);
         if (employeeData && employeeData.attendance.has(day)) {
           const dayData = employeeData.attendance.get(day);
+          
+          // Debug first day of month for first few employees
+          if (day === 1 && empIndex < 5) {
+            console.log(`Debug day 1 - ${employee.name} (${employee.lookupKey}): Status=${dayData.status || 'none'}`);
+          }
           
           // Handle different time labels
           if (label === 'Tiba' && dayData.checkIn) {
