@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   FiMail, 
   FiSearch, 
@@ -9,87 +9,89 @@ import {
 } from 'react-icons/fi';
 import AdminAuthWrapper from '@/components/AdminAuthWrapper';
 import { useRouter } from 'next/navigation';
-
-// Dummy data for leave requests
-const initialLeaveRequests = [
-  {
-    id: 1,
-    employee: 'John Doe',
-    department: 'Engineering',
-    type: 'Sick Leave',
-    startDate: '2023-11-10',
-    endDate: '2023-11-12',
-    reason: 'Medical appointment and recovery',
-    status: 'Pending',
-    isRead: false,
-    submitDate: '2023-11-05'
-  },
-  {
-    id: 2,
-    employee: 'Jane Smith',
-    department: 'HR',
-    type: 'Annual Leave',
-    startDate: '2023-11-15',
-    endDate: '2023-11-20',
-    reason: 'Family vacation',
-    status: 'Pending',
-    isRead: false,
-    submitDate: '2023-11-01'
-  },
-  {
-    id: 3,
-    employee: 'Mike Johnson',
-    department: 'Marketing',
-    type: 'Personal Leave',
-    startDate: '2023-11-08',
-    endDate: '2023-11-09',
-    reason: 'Personal matters',
-    status: 'Pending',
-    isRead: true,
-    submitDate: '2023-10-30'
-  },
-  {
-    id: 4,
-    employee: 'Sarah Williams',
-    department: 'Finance',
-    type: 'Sick Leave',
-    startDate: '2023-11-11',
-    endDate: '2023-11-13',
-    reason: 'Fever and flu',
-    status: 'Pending',
-    isRead: true,
-    submitDate: '2023-11-02'
-  },
-  {
-    id: 5,
-    employee: 'Robert Chen',
-    department: 'IT',
-    type: 'Annual Leave',
-    startDate: '2023-12-01',
-    endDate: '2023-12-10',
-    reason: 'Year-end vacation',
-    status: 'Pending',
-    isRead: false,
-    submitDate: '2023-11-06'
-  }
-];
+import LeaveRequestService from '@/app/api/leave_request';
 
 function LeaveRequestPage() {
-  const [leaveRequests, setLeaveRequests] = useState(initialLeaveRequests);
+  const [leaveRequests, setLeaveRequests] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const router = useRouter();
 
-  const handleRequestClick = (request) => {
-    // Update the read status
-    if (!request.isRead) {
-      const updatedRequests = leaveRequests.map(req => 
-        req.id === request.id ? { ...req, isRead: true } : req
-      );
-      setLeaveRequests(updatedRequests);
+  // Fetch leave requests from backend
+  const fetchLeaveRequests = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await LeaveRequestService.getAllRequests();
+      if (response.success) {
+        // Transform API response to match our component's data structure
+        const transformedRequests = response.data.map(req => ({
+          id: req.requestId,
+          employee: req.fullName,
+          type: req.requestType === 'sick' ? 'Sakit' : 'Izin',
+          status: req.approvalStatus || 'Pending',
+          isRead: req.isOpen, // Corrected: isOpen means it has been read
+          submitDate: req.requestedAt,
+          approverComment: req.approverComment || '-' // Add approver comment
+        }));
+        setLeaveRequests(transformedRequests);
+      } else {
+        setError('Failed to fetch leave requests');
+      }
+    } catch (err) {
+      setError('An error occurred while fetching data');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
     }
-    
-    // Navigate to detail page instead of showing details inline
-    router.push(`/admin/leave-request/${request.id}`);
+  };
+
+  useEffect(() => {
+    fetchLeaveRequests();
+  }, []);
+
+  const handleRequestClick = async (request) => {
+    try {
+      // Get user info from localStorage for userId
+      const userString = localStorage.getItem('user');
+      let userId = null;
+      
+      if (userString) {
+        const user = JSON.parse(userString);
+        userId = user.userId;
+      }
+      
+      if (!userId) {
+        console.error("User ID not found in localStorage");
+        return;
+      }
+
+      // First call: Mark the request as read/open
+      await LeaveRequestService.changeStatusRequest(request.id, {
+        isOpen: true,
+        userId: userId
+      });
+      
+      // Update the read status locally
+      if (!request.isRead) {
+        const updatedRequests = leaveRequests.map(req => 
+          req.id === request.id ? { ...req, isRead: true } : req
+        );
+        setLeaveRequests(updatedRequests);
+      }
+      
+      // Navigate to detail page
+      router.push(`/admin/leave-request/${request.id}`);
+    } catch (error) {
+      console.error("Error updating request status:", error);
+      // Still navigate to the detail page even if status update fails
+      router.push(`/admin/leave-request/${request.id}`);
+    }
+  };
+
+  const handleRefresh = () => {
+    fetchLeaveRequests();
   };
 
   const unreadCount = leaveRequests.filter(req => !req.isRead).length;
@@ -97,8 +99,7 @@ function LeaveRequestPage() {
   // Filter leave requests based on search query
   const filteredRequests = leaveRequests.filter(req =>
     req.employee.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    req.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    req.department.toLowerCase().includes(searchQuery.toLowerCase())
+    req.type.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Helper to get status color
@@ -156,7 +157,10 @@ function LeaveRequestPage() {
         </div>
         
         <div className="flex space-x-2">
-          <button className="p-2 rounded-full hover:bg-gray-100">
+          <button 
+            className="p-2 rounded-full hover:bg-gray-100" 
+            onClick={handleRefresh}
+          >
             <FiRefreshCw className="w-5 h-5 text-gray-500" />
           </button>
           <button className="p-2 rounded-full hover:bg-gray-100">
@@ -178,118 +182,149 @@ function LeaveRequestPage() {
         />
       </div>
       
-      {/* Leave requests list - now full width */}
-      <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
-        <div className="overflow-y-auto max-h-[calc(100vh-200px)]">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Guru</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis Pengajuan</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal Pengajuan</th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredRequests.length > 0 ? (
-                filteredRequests.map((request) => (
-                  <tr 
-                    key={request.id} 
-                    className={`hover:bg-gray-50 ${!request.isRead ? 'bg-blue-50' : ''}`}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className={`text-sm ${!request.isRead ? 'font-bold' : 'font-medium'} text-gray-900`}>
-                          {request.employee}
+      {isLoading ? (
+        <div className="flex justify-center items-center p-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-md">
+          <p>{error}</p>
+          <button 
+            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+            onClick={handleRefresh}
+          >
+            Coba lagi
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Leave requests list - now full width */}
+          <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200 hidden md:block">
+            <div className="overflow-y-auto max-h-[calc(100vh-200px)]">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Guru</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis Pengajuan</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal Pengajuan</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Catatan</th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredRequests.length > 0 ? (
+                    filteredRequests.map((request) => (
+                      <tr 
+                        key={request.id} 
+                        className={`hover:bg-gray-50 ${!request.isRead ? 'bg-blue-50' : ''}`}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className={`text-sm ${!request.isRead ? 'font-bold' : 'font-medium'} text-gray-900`}>
+                              {request.employee}
+                            </div>
+                          </div>
+                        </td>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${!request.isRead ? 'font-bold' : ''} text-gray-500`}>
+                          {request.type}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(request.status)}`}>
+                            {request.status}
+                          </span>
+                        </td>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${!request.isRead ? 'font-bold' : ''} text-gray-500`}>
+                          {formatDate(request.submitDate)}
+                        </td>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${!request.isRead ? 'font-bold' : ''} text-gray-500 max-w-xs truncate`}>
+                          {request.approverComment}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => handleRequestClick(request)}
+                            className="text-blue-600 hover:text-blue-900 inline-flex items-center"
+                          >
+                            <FiEye className="w-4 h-4 mr-1" />
+                            <span>Lihat</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                        Tidak ada pengajuan izin yang ditemukan.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Responsive view for mobile */}
+          <div className="md:hidden">
+            <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
+              <ul className="divide-y divide-gray-200">
+                {filteredRequests.length > 0 ? (
+                  filteredRequests.map((request) => (
+                    <li 
+                      key={request.id}
+                      className={`cursor-pointer hover:bg-gray-50 transition-colors 
+                        ${!request.isRead ? 'border-l-4 border-blue-500' : ''}`}
+                    >
+                      <div className="px-4 py-3" onClick={() => handleRequestClick(request)}>
+                        <div className="flex justify-between">
+                          <span className={`text-sm ${!request.isRead ? 'font-bold' : 'font-medium'} text-gray-900`}>
+                            {request.employee}
+                          </span>
+                          <span className={`text-xs ${!request.isRead ? 'font-bold' : ''} text-gray-500`}>
+                            {formatDate(request.submitDate)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex justify-between">
+                          <p className={`text-sm ${!request.isRead ? 'font-bold' : ''} text-gray-700`}>
+                            {request.type}
+                          </p>
+                          <span className={`inline-flex text-xs px-2 py-1 rounded-full ${getStatusColor(request.status)}`}>
+                            {request.status}
+                          </span>
+                        </div>
+                        {/* Display approver comment in mobile view */}
+                        {request.approverComment !== '-' && (
+                          <div className="mt-1">
+                            <p className="text-xs text-gray-600">Catatan:</p>
+                            <p className={`text-sm ${!request.isRead ? 'font-semibold' : ''} text-gray-700 truncate`}>
+                              {request.approverComment}
+                            </p>
+                          </div>
+                        )}
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRequestClick(request);
+                            }}
+                            className="text-blue-600 hover:text-blue-900 inline-flex items-center"
+                          >
+                            <FiEye className="w-4 h-4 mr-1" />
+                            <span>Lihat</span>
+                          </button>
                         </div>
                       </div>
-                    </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${!request.isRead ? 'font-bold' : ''} text-gray-500`}>
-                      {request.type}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(request.status)}`}>
-                        {request.status}
-                      </span>
-                    </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${!request.isRead ? 'font-bold' : ''} text-gray-500`}>
-                      {formatDate(request.submitDate)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => handleRequestClick(request)}
-                        className="text-blue-600 hover:text-blue-900 inline-flex items-center"
-                      >
-                        <FiEye className="w-4 h-4 mr-1" />
-                        <span>Lihat</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                    </li>
+                  ))
+                ) : (
+                  <li className="px-4 py-5 text-center text-gray-500">
                     Tidak ada pengajuan izin yang ditemukan.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Responsive view for mobile */}
-      <div className="md:hidden">
-        <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
-          <ul className="divide-y divide-gray-200">
-            {filteredRequests.length > 0 ? (
-              filteredRequests.map((request) => (
-                <li 
-                  key={request.id}
-                  className={`cursor-pointer hover:bg-gray-50 transition-colors 
-                    ${!request.isRead ? 'border-l-4 border-blue-500' : ''}`}
-                >
-                  <div className="px-4 py-3" onClick={() => handleRequestClick(request)}>
-                    <div className="flex justify-between">
-                      <span className={`text-sm ${!request.isRead ? 'font-bold' : 'font-medium'} text-gray-900`}>
-                        {request.employee}
-                      </span>
-                      <span className={`text-xs ${!request.isRead ? 'font-bold' : ''} text-gray-500`}>
-                        {formatDate(request.submitDate)}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex justify-between">
-                      <p className={`text-sm ${!request.isRead ? 'font-bold' : ''} text-gray-700`}>
-                        {request.type}
-                      </p>
-                      <span className={`inline-flex text-xs px-2 py-1 rounded-full ${getStatusColor(request.status)}`}>
-                        {request.status}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRequestClick(request);
-                        }}
-                        className="text-blue-600 hover:text-blue-900 inline-flex items-center"
-                      >
-                        <FiEye className="w-4 h-4 mr-1" />
-                        <span>Lihat</span>
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))
-            ) : (
-              <li className="px-4 py-5 text-center text-gray-500">
-                Tidak ada pengajuan izin yang ditemukan.
-              </li>
-            )}
-          </ul>
-        </div>
-      </div>
+                  </li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

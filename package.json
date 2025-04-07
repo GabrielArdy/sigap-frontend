@@ -31,6 +31,7 @@
     "react-qr-code": "^2.0.15",
     "react-toastify": "^11.0.5",
     "recharts": "^2.15.1",
+    "sharp": "^0.33.5",
     "sweetalert2": "^11.6.13",
     "zxcvbn": "^4.4.2"
   },

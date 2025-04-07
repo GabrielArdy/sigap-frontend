@@ -6,87 +6,7 @@ import { FiArrowLeft, FiCheck, FiX, FiPaperclip } from 'react-icons/fi';
 import AdminAuthWrapper from '@/components/AdminAuthWrapper';
 import Swal from 'sweetalert2';
 import Image from 'next/image';
-
-// Using the same dummy data from the list page with added document URLs
-const leaveRequests = [
-  {
-    id: 1,
-    employee: 'John Doe',
-    department: 'Engineering',
-    type: 'Sick Leave',
-    startDate: '2023-11-10',
-    endDate: '2023-11-12',
-    reason: 'Medical appointment and recovery',
-    status: 'Pending',
-    isRead: false,
-    submitDate: '2023-11-05',
-    employeeId: 'EMP001',
-    position: 'Software Engineer',
-    details: 'Need to see a doctor for a persistent cough and then rest.',
-    documentUrl: 'https://cdn.pixabay.com/photo/2020/07/14/13/07/icon-5404125_1280.png'
-  },
-  {
-    id: 2,
-    employee: 'Jane Smith',
-    department: 'HR',
-    type: 'Annual Leave',
-    startDate: '2023-11-15',
-    endDate: '2023-11-20',
-    reason: 'Family vacation',
-    status: 'Pending',
-    isRead: false,
-    submitDate: '2023-11-01',
-    employeeId: 'EMP002',
-    position: 'HR Manager',
-    details: 'Annual family trip that was planned months in advance.',
-    documentUrl: null
-  },
-  {
-    id: 3,
-    employee: 'Mike Johnson',
-    department: 'Marketing',
-    type: 'Personal Leave',
-    startDate: '2023-11-08',
-    endDate: '2023-11-09',
-    reason: 'Personal matters',
-    status: 'Pending',
-    isRead: true,
-    submitDate: '2023-10-30',
-    employeeId: 'EMP003',
-    position: 'Marketing Specialist',
-    details: 'Need to attend to some urgent family matters.'
-  },
-  {
-    id: 4,
-    employee: 'Sarah Williams',
-    department: 'Finance',
-    type: 'Sick Leave',
-    startDate: '2023-11-11',
-    endDate: '2023-11-13',
-    reason: 'Fever and flu',
-    status: 'Pending',
-    isRead: true,
-    submitDate: '2023-11-02',
-    employeeId: 'EMP004',
-    position: 'Financial Analyst',
-    details: 'Coming down with a fever and need time to recover.'
-  },
-  {
-    id: 5,
-    employee: 'Robert Chen',
-    department: 'IT',
-    type: 'Annual Leave',
-    startDate: '2023-12-01',
-    endDate: '2023-12-10',
-    reason: 'Year-end vacation',
-    status: 'Pending',
-    isRead: false,
-    submitDate: '2023-11-06',
-    employeeId: 'EMP005',
-    position: 'IT Support Specialist',
-    details: 'End of year vacation to visit family overseas.'
-  }
-];
+import LeaveRequestService from '@/app/api/leave_request';
 
 function LeaveRequestDetailPage() {
   const router = useRouter();
@@ -96,19 +16,67 @@ function LeaveRequestDetailPage() {
   const [statusUpdate, setStatusUpdate] = useState(null);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [comment, setComment] = useState('');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Simulate API fetch with a small delay
-    const timer = setTimeout(() => {
-      const foundRequest = leaveRequests.find(req => req.id === Number(id));
-      setRequest(foundRequest);
-      setIsLoading(false);
-    }, 300);
+    const fetchRequestDetails = async () => {
+      setIsLoading(true);
+      try {
+        const response = await LeaveRequestService.getRequestById(id);
+        
+        if (response.success && response.data) {
+          // Transform API response to match our component's data structure
+          const transformedRequest = {
+            id: response.data.requestId,
+            employee: response.data.requesterName,
+            type: response.data.requestType === 'sick' ? 'Sakit' : 'Izin',
+            startDate: response.data.requestedStartDate,
+            endDate: response.data.requestedEndDate,
+            reason: response.data.description,
+            status: response.data.approvalStatus || 'Pending', // Fixed typo: aprovalStatus -> approvalStatus
+            submitDate: response.data.requestedAt,
+            isRead: response.data.isOpen, // Corrected: isOpen means it has been read
+            documentUrl: response.data.attachment ? `data:image/jpeg;base64,${response.data.attachment}` : null,
+            // Add any additional fields we want to display
+            approverComment: response.data.approverComment || '',
+            approverId: response.data.approverId
+          };
+          setRequest(transformedRequest);
+        } else {
+          setError("Failed to fetch request details");
+        }
+      } catch (err) {
+        console.error("Error fetching request details:", err);
+        setError("Error loading request details");
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-    return () => clearTimeout(timer);
+    if (id) {
+      fetchRequestDetails();
+    }
   }, [id]);
 
-  const handleStatusChange = (newStatus) => {
+  const handleStatusChange = async (newStatus) => {
+    // Get the current user from localStorage for approverId
+    const userString = localStorage.getItem('user');
+    let userId = null;
+    
+    if (userString) {
+      const user = JSON.parse(userString);
+      userId = user.userId;
+    }
+    
+    if (!userId) {
+      Swal.fire({
+        title: 'Error',
+        text: 'Unable to identify approver. Please log in again.',
+        icon: 'error'
+      });
+      return;
+    }
+
     if (newStatus === 'Approved') {
       Swal.fire({
         title: 'Setujui Pengajuan',
@@ -130,7 +98,7 @@ function LeaveRequestDetailPage() {
         }
       }).then((result) => {
         if (result.isConfirmed) {
-          completeStatusChange(newStatus, result.value);
+          completeStatusChange(newStatus, result.value, userId);
         }
       });
     } else if (newStatus === 'Rejected') {
@@ -158,37 +126,57 @@ function LeaveRequestDetailPage() {
         }
       }).then((result) => {
         if (result.isConfirmed) {
-          completeStatusChange(newStatus, result.value);
+          completeStatusChange(newStatus, result.value, userId);
         }
       });
     }
   };
 
-  const completeStatusChange = (newStatus, commentText) => {
-    setRequest(prev => ({
-      ...prev,
-      status: newStatus,
-      approverComment: commentText
-    }));
-    setStatusUpdate(newStatus);
-    
-    // Show success message
-    Swal.fire({
-      title: newStatus === 'Approved' ? 'Pengajuan Disetujui' : 'Pengajuan Ditolak',
-      text: newStatus === 'Approved' 
-        ? 'Pengajuan izin berhasil disetujui' 
-        : 'Pengajuan izin berhasil ditolak',
-      icon: 'success',
-      timer: 2000,
-      showConfirmButton: false
-    });
-    
-    // In a real app, this would be an API call
-    // For now, just show the status change locally
-    setTimeout(() => {
-      // Navigate back after update (simulating success)
-      router.push('/admin/leave-request');
-    }, 2500);
+  const completeStatusChange = async (newStatus, commentText, approverId) => {
+    try {
+      setStatusUpdate(newStatus);
+      
+      // Call API to update approval status
+      const response = await LeaveRequestService.changeApprovalStatus(id, {
+        approvalStatus: newStatus,
+        approverId: approverId,
+        approverComment: commentText || ''
+      });
+      
+      if (response.success) {
+        // Update local state
+        setRequest(prev => ({
+          ...prev,
+          status: newStatus,
+          approverComment: commentText
+        }));
+        
+        // Show success message
+        Swal.fire({
+          title: newStatus === 'Approved' ? 'Pengajuan Disetujui' : 'Pengajuan Ditolak',
+          text: newStatus === 'Approved' 
+            ? 'Pengajuan izin berhasil disetujui' 
+            : 'Pengajuan izin berhasil ditolak',
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false
+        });
+        
+        // Navigate back after update
+        setTimeout(() => {
+          router.push('/admin/leave-request');
+        }, 2500);
+      } else {
+        throw new Error('Failed to update approval status');
+      }
+    } catch (error) {
+      console.error("Error updating approval status:", error);
+      Swal.fire({
+        title: 'Error',
+        text: 'Failed to update request status. Please try again.',
+        icon: 'error'
+      });
+    }
   };
 
   // Calculate leave duration in days
@@ -218,6 +206,21 @@ function LeaveRequestDetailPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-lg text-center">
+        <h2 className="text-xl font-semibold text-red-600">Error</h2>
+        <p className="mt-2">{error}</p>
+        <button
+          onClick={() => router.push('/admin/leave-request')}
+          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+        >
+          <FiArrowLeft className="mr-2" /> Kembali ke Daftar
+        </button>
+      </div>
+    );
+  }
+
   if (!request) {
     return (
       <div className="bg-white rounded-lg shadow p-6 text-center">
@@ -232,6 +235,9 @@ function LeaveRequestDetailPage() {
       </div>
     );
   }
+
+  // Check if the request can be approved/rejected
+  const canChangeStatus = request.status === 'Pending';
 
   return (
     <div className="space-y-6">
@@ -304,18 +310,8 @@ function LeaveRequestDetailPage() {
             </div>
             
             <div className="bg-white px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">ID Karyawan</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{request.employeeId}</dd>
-            </div>
-            
-            <div className="bg-gray-50 px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Departemen</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{request.department}</dd>
-            </div>
-            
-            <div className="bg-white px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Posisi</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{request.position}</dd>
+              <dt className="text-sm font-medium text-gray-500">Nama Karyawan</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{request.employee}</dd>
             </div>
             
             <div className="bg-gray-50 px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -371,7 +367,7 @@ function LeaveRequestDetailPage() {
             </div>
             
             {request.approverComment && (
-              <div className="bg-white px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+              <div className="bg-gray-50 px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt className="text-sm font-medium text-gray-500">Komentar Approver</dt>
                 <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{request.approverComment}</dd>
               </div>
@@ -380,7 +376,7 @@ function LeaveRequestDetailPage() {
         </div>
       </div>
 
-      {request.status === 'Pending' && (
+      {canChangeStatus && (
         <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 justify-end">
           <button
             onClick={() => handleStatusChange('Rejected')}

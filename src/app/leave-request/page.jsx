@@ -38,6 +38,8 @@ function LeaveRequestList() {
             reason: item.description,
             status: item.approvalStatus.toLowerCase(),
             createdAt: new Date(item.requestedAt),
+            // Add approver comment
+            approverComment: item.approverComment || null,
             // Only include reviewedBy if not pending
             reviewedBy: item.approvalStatus.toLowerCase() !== 'pending' ? {
               name: item.approverName,
@@ -196,6 +198,14 @@ function LeaveRequestList() {
                             <p className="text-xs text-slate-400">{formatDate(request.reviewedBy.date)}</p>
                           </div>
                         </div>
+                        
+                        {/* Add approver comment display */}
+                        {request.approverComment && (
+                          <div className="mt-2 bg-slate-50 p-3 rounded-md border border-slate-200">
+                            <p className="text-xs text-slate-500 mb-1">Komentar:</p>
+                            <p className="text-sm">{request.approverComment}</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

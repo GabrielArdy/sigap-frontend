@@ -6,7 +6,6 @@ import AuthWrapper from '@/components/AuthWrapper';
 import 'react-calendar/dist/Calendar.css';
 import { FaUserCircle, FaCalendarAlt, FaFileAlt, FaClipboardList, FaChevronLeft } from 'react-icons/fa';
 import LeaveRequestService from '@/app/api/leave_request';
-import { uploadFile } from '@/utils/fileUpload';
 
 function LeaveRequestForm() {
   const router = useRouter();
@@ -20,6 +19,23 @@ function LeaveRequestForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isRangeSelection, setIsRangeSelection] = useState(false);
+  const [documentBase64, setDocumentBase64] = useState('');
+
+  // Function to convert image to base64
+  const processImageToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        try {
+          resolve(reader.result);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
 
   // Load user data from localStorage on component mount
   useEffect(() => {
@@ -76,7 +92,7 @@ function LeaveRequestForm() {
   };
 
   // Handle file input change with updated validation
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
       // Check file size (max 2MB)
@@ -93,8 +109,17 @@ function LeaveRequestForm() {
         return;
       }
       
-      setSupportingDocument(file);
-      setError('');
+      try {
+        // Convert file to base64 with data URI prefix
+        const dataUri = await processImageToBase64(file);
+        setDocumentBase64(dataUri);
+        setSupportingDocument(file);
+        setError('');
+      } catch (err) {
+        console.error('Error processing file:', err);
+        setError('Failed to process image file');
+        e.target.value = null;
+      }
     }
   };
 
@@ -117,17 +142,9 @@ function LeaveRequestForm() {
     setError('');
     
     try {
-      // First handle file upload if there's a supporting document
-      let attachmentPath = '';
-      if (supportingDocument) {
-        const uploadResult = await uploadFile(supportingDocument);
-        if (!uploadResult.success) {
-          throw new Error(`Failed to upload document: ${uploadResult.error}`);
-        }
-        attachmentPath = uploadResult.filepath;
-      }
+      // Prepare request data - extract base64 part without the data URI prefix for backend
+      const base64Only = documentBase64 ? documentBase64.split(',')[1] || '' : '';
       
-      // Prepare request data
       const requestData = {
         requestType: requestType,
         requesterId: userData.userId,
@@ -138,10 +155,10 @@ function LeaveRequestForm() {
           ? selectedDates[1].toISOString() 
           : selectedDates.toISOString(),
         description: reason,
-        attachment: attachmentPath
+        attachment: base64Only // Send only the base64 part to the backend
       };
       
-      console.log('Submitting request:', requestData);
+      console.log('Submitting request with attachment:', documentBase64 ? 'Base64 image included' : 'No attachment');
       
       // Submit request to backend
       const response = await LeaveRequestService.createNewRequest(requestData);
@@ -407,6 +424,15 @@ function LeaveRequestForm() {
                 {supportingDocument && (
                   <div className="mt-3 text-sm bg-blue-50 rounded-lg p-2 text-blue-700">
                     {supportingDocument.name}
+                    {documentBase64 && (
+                      <div className="mt-2">
+                        <img 
+                          src={documentBase64} 
+                          alt="Preview" 
+                          className="max-h-32 mx-auto rounded" 
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
